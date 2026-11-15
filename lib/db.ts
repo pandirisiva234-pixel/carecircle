@@ -64,11 +64,11 @@ function initFirestore(): admin.firestore.Firestore | null {
   // If any required Firestore credential is missing, gracefully fall back to in-memory store
   if (!projectId || !clientEmail || !privateKey) {
     // Only log once
-    if (!(globalThis as any).__carecircle_db_logged) {
+    if (!globalThis.__carecircle_db_logged) {
       console.log(
         "[CareCircle DB] Firebase credentials missing or partial (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY). Using in-memory store with seeded demo data (Vercel & Judge ready)."
       );
-      (globalThis as any).__carecircle_db_logged = true;
+      globalThis.__carecircle_db_logged = true;
     }
     return null;
   }
@@ -430,6 +430,8 @@ function getInitialDemoData(): StoreSchema {
 declare global {
   // eslint-disable-next-line no-var
   var __carecircle_in_memory_store: StoreSchema | undefined;
+  // eslint-disable-next-line no-var
+  var __carecircle_db_logged: boolean | undefined;
 }
 
 function getStore(): StoreSchema {
@@ -616,6 +618,38 @@ export async function saveDoseEvent(event: DoseEvent): Promise<void> {
       await withTimeout(db.collection("dose_events").doc(event.id).set(event), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore saveDoseEvent failed, saved in-memory:", err);
+    }
+  }
+}
+
+/** Reads one dose event by id (single document read, no collection scan). */
+export async function getDoseEventById(id: string): Promise<DoseEvent | null> {
+  const db = initFirestore();
+  if (db) {
+    try {
+      const doc = await withTimeout(db.collection("dose_events").doc(id).get(), "read");
+      if (doc.exists) return doc.data() as DoseEvent;
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getDoseEventById failed, falling back to in-memory:", err);
+    }
+  }
+  return getStore().doseEvents[id] || null;
+}
+
+/** Saves many dose events in one batched write instead of one round-trip per dose. */
+export async function saveDoseEvents(events: DoseEvent[]): Promise<void> {
+  if (events.length === 0) return;
+  const store = getStore();
+  for (const ev of events) store.doseEvents[ev.id] = ev;
+
+  const db = initFirestore();
+  if (db) {
+    try {
+      const batch = db.batch();
+      for (const ev of events) batch.set(db.collection("dose_events").doc(ev.id), ev);
+      await withTimeout(batch.commit(), "batch-write");
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore saveDoseEvents failed, saved in-memory:", err);
     }
   }
 }

@@ -53,7 +53,8 @@ export default function DashboardPage() {
   const [isAptModalOpen, setIsAptModalOpen] = useState(false);
   const [aptToEdit, setAptToEdit] = useState<Appointment | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"today" | "medications" | "scan" | "appointments" | "activity">("today");
+  type DashboardTab = "today" | "medications" | "scan" | "appointments" | "activity";
+  const [activeTab, setActiveTab] = useState<DashboardTab>("today");
 
   // Fetch session user
   useEffect(() => {
@@ -78,40 +79,52 @@ export default function DashboardPage() {
     loadUser();
   }, [router]);
 
-  // Load all data
-  const loadData = useCallback(async () => {
+  // Data loaders: each section can refresh on its own, so a dose tap doesn't refetch everything
+  const fetchJson = useCallback(async <T,>(url: string): Promise<T | null> => {
     try {
-      const [dosesRes, medsRes, aptsRes, actsRes] = await Promise.all([
-        fetch("/api/doses"),
-        fetch("/api/medications"),
-        fetch("/api/appointments"),
-        fetch("/api/activity"),
-      ]);
-
-      if (dosesRes.ok) {
-        const dData = await dosesRes.json();
-        setDoses(dData.doses || []);
-        setMetrics(dData.metrics || null);
-      }
-
-      if (medsRes.ok) {
-        const mData = await medsRes.json();
-        setMedications(mData.medications || []);
-      }
-
-      if (aptsRes.ok) {
-        const aData = await aptsRes.json();
-        setAppointments(aData.appointments || []);
-      }
-
-      if (actsRes.ok) {
-        const actData = await actsRes.json();
-        setActivityLogs(actData.logs || []);
-      }
+      const res = await fetch(url);
+      return res.ok ? ((await res.json()) as T) : null;
     } catch (err) {
-      console.error("Failed loading circle data", err);
+      console.error(`Failed loading ${url}`, err);
+      return null;
     }
   }, []);
+
+  const loadDoses = useCallback(async () => {
+    const data = await fetchJson<{ doses: DoseEvent[]; metrics: AdherenceSummary }>("/api/doses");
+    if (data) {
+      setDoses(data.doses || []);
+      setMetrics(data.metrics || null);
+    }
+  }, [fetchJson]);
+
+  const loadMedications = useCallback(async () => {
+    const data = await fetchJson<{ medications: Medication[] }>("/api/medications");
+    if (data) setMedications(data.medications || []);
+  }, [fetchJson]);
+
+  const loadAppointments = useCallback(async () => {
+    const data = await fetchJson<{ appointments: Appointment[] }>("/api/appointments");
+    if (data) setAppointments(data.appointments || []);
+  }, [fetchJson]);
+
+  const loadActivity = useCallback(async () => {
+    const data = await fetchJson<{ logs: ActivityLog[] }>("/api/activity");
+    if (data) setActivityLogs(data.logs || []);
+  }, [fetchJson]);
+
+  const loadData = useCallback(async () => {
+    await Promise.all([loadDoses(), loadMedications(), loadAppointments(), loadActivity()]);
+  }, [loadDoses, loadMedications, loadAppointments, loadActivity]);
+
+  /** After a medication change: schedule, medication list and audit log change; appointments don't. */
+  const refreshAfterMedicationChange = useCallback(async () => {
+    await Promise.all([loadDoses(), loadMedications(), loadActivity()]);
+  }, [loadDoses, loadMedications, loadActivity]);
+
+  const refreshAfterAppointmentChange = useCallback(async () => {
+    await Promise.all([loadAppointments(), loadActivity()]);
+  }, [loadAppointments, loadActivity]);
 
   useEffect(() => {
     if (user) {
@@ -129,7 +142,7 @@ export default function DashboardPage() {
       });
 
       if (res.ok) {
-        await loadData();
+        await Promise.all([loadDoses(), loadActivity()]);
       }
     } catch (err) {
       console.error("Failed updating dose", err);
@@ -142,7 +155,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`/api/medications/${id}`, { method: "DELETE" });
       if (res.ok) {
-        await loadData();
+        await refreshAfterMedicationChange();
       }
     } catch (err) {
       console.error("Failed deleting medication", err);
@@ -155,7 +168,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`/api/appointments/${id}`, { method: "DELETE" });
       if (res.ok) {
-        await loadData();
+        await refreshAfterAppointmentChange();
       }
     } catch (err) {
       console.error("Failed deleting appointment", err);
@@ -255,17 +268,17 @@ export default function DashboardPage() {
             aria-label="Dashboard sections"
             className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto pb-2 scrollbar-none"
           >
-            {[
+            {([
               { id: "today", label: "Today's Schedule & Adherence", icon: <Clock className="w-4 h-4" /> },
               { id: "medications", label: `Medications (${medications.length})`, icon: <Pill className="w-4 h-4" /> },
               { id: "scan", label: "Gemini Prescription Scan", icon: <Sparkles className="w-4 h-4" /> },
               { id: "appointments", label: `Appointments (${appointments.length})`, icon: <Calendar className="w-4 h-4" /> },
               { id: "activity", label: "Activity Audit", icon: <FileText className="w-4 h-4" /> },
-            ].map((tab) => (
+            ] as Array<{ id: DashboardTab; label: string; icon: React.ReactNode }>).map((tab) => (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 aria-current={activeTab === tab.id ? "page" : undefined}
                 className={`px-4 py-2.5 rounded-xl font-bold text-sm flex items-center space-x-2 whitespace-nowrap transition-all border ${
                   activeTab === tab.id
@@ -505,7 +518,7 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <PrescriptionScanner
               onMedicationsAdded={() => {
-                loadData();
+                refreshAfterMedicationChange();
                 setActiveTab("medications");
               }}
               highContrast={highContrast}
@@ -639,7 +652,7 @@ export default function DashboardPage() {
       <MedicationModal
         isOpen={isMedModalOpen}
         onClose={() => setIsMedModalOpen(false)}
-        onSaved={loadData}
+        onSaved={refreshAfterMedicationChange}
         medicationToEdit={medToEdit}
         highContrast={highContrast}
       />
@@ -648,7 +661,7 @@ export default function DashboardPage() {
       <AppointmentModal
         isOpen={isAptModalOpen}
         onClose={() => setIsAptModalOpen(false)}
-        onSaved={loadData}
+        onSaved={refreshAfterAppointmentChange}
         appointmentToEdit={aptToEdit}
         highContrast={highContrast}
       />

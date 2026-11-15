@@ -4,7 +4,7 @@ import {
   getMembersByCircle,
   getMedications,
   getDoseEvents,
-  saveDoseEvent,
+  saveDoseEvents,
   updateDoseEvent,
   getAppointments,
   saveAppointment,
@@ -79,14 +79,11 @@ export async function POST(req: NextRequest) {
       const existingDoses = await getDoseEvents(circleId, todayStr);
       const todayDoses = buildDoseEventsForDay(meds, existingDoses, todayStr, circleId);
 
-      for (const dose of todayDoses) {
-        if (!existingDoses.some((e) => e.id === dose.id)) {
-          await saveDoseEvent(dose);
-        }
-      }
+      const existingIds = new Set(existingDoses.map((e) => e.id));
+      await saveDoseEvents(todayDoses.filter((d) => !existingIds.has(d.id)));
 
-      // Re-fetch all today's doses
-      const currentDoses = await getDoseEvents(circleId, todayStr);
+      // The reconciled list already contains every dose for today: no second read needed
+      const currentDoses = todayDoses;
 
       // B. Upcoming Doses Check (scheduled within next 30 minutes, not yet taken)
       for (const dose of currentDoses) {

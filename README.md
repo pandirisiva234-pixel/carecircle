@@ -109,10 +109,11 @@ Next.js 15 (App Router, TypeScript) · React 19 · Tailwind CSS · Google Cloud 
 ## 🧪 Testing
 
 ```bash
-npm test
+npm test           # unit tests
+npm run typecheck  # strict TypeScript
 ```
 
-**44 unit tests** across 6 suites (Vitest):
+**48 unit tests** across 7 suites, run automatically on every push by the **CI workflow** (`.github/workflows/ci.yml`: type-check + tests) (Vitest):
 
 | Suite | Covers |
 |---|---|
@@ -120,12 +121,15 @@ npm test
 | `timezone.test.ts` | IST vs UTC day boundaries, 8:00 IST → 02:30 UTC, DST zones, month/year rollovers, deterministic dose IDs |
 | `auth.test.ts` | Session signing, **tamper and role-escalation rejection**, expiry, bcrypt hashing, rate limiting |
 | `validations.test.ts` | Invalid times and dates, limits, unknown roles, email requirements, dose statuses |
+| `db.test.ts` | Demo seeding, hashed passcodes, batched writes, single-document reads, circle isolation |
 | `email.test.ts` | Demo addresses never receive real mail; sending never throws |
 | `gemini.test.ts` | Current model with automatic fallback, no raw API errors shown to users |
 
 ## 📈 Scalability
 
 - Stateless serverless API; scales horizontally on Vercel or Cloud Run.
+- **Few round-trips per request:** the dose endpoint makes 2 parallel reads, writes new doses in one **batched write**, and computes adherence over the last 7 days only. Dose updates use a **single-document read** for authorisation.
+- The dashboard refreshes **only the data that changed** (a dose tap reloads doses and the audit log, not appointments or medicines).
 - Firestore queries use **equality filters only** (sorting in code), so they need no composite indexes and scale with the data.
 - **Deterministic dose IDs** (`dose-{med}-{date}-{time}`) make reconciliation idempotent: repeated or parallel requests never create duplicate doses.
 - Seeding and reminders are idempotent and safe to retry.
@@ -178,6 +182,7 @@ app/
     cron/reminders/        Reminder + escalation engine (GitHub Actions)
     seed/ health/          Demo seeding, status check
 components/                DoseCard, TodayProgress, AdherenceChart, PrescriptionScanner, ...
+  landing/                 Data-driven landing sections (stats, features, steps, demo logins)
 lib/
   db.ts                    Firestore data layer (timeouts + in-memory fallback + seeding)
   adherence.ts             Scheduling, adherence and escalation logic (pure, tested)
@@ -186,7 +191,7 @@ lib/
   gemini.ts  email.ts      Google AI + email integrations
   validations.ts           zod schemas
 tests/                     Vitest suites
-.github/workflows/         15-minute reminders workflow
+.github/workflows/         CI (type-check + tests) and 15-minute reminders
 ```
 
 ## 🔌 API overview

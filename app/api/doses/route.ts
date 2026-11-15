@@ -2,18 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { doseUpdateSchema } from "@/lib/validations";
 import {
-  getDoseEvents,
   getAllDoseEvents,
+  getDoseEventById,
   getMedications,
-  saveDoseEvent,
+  saveDoseEvents,
   updateDoseEvent,
   logActivity,
 } from "@/lib/db";
-import {
-  buildDoseEventsForDay,
-  calculateAdherenceMetrics,
-} from "@/lib/adherence";
-import { todayInTz } from "@/lib/timezone";
+import { buildDoseEventsForDay, calculateAdherenceMetrics } from "@/lib/adherence";
+import { todayInTz, addDays } from "@/lib/timezone";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -26,21 +23,23 @@ export async function GET(req: NextRequest) {
   const requestedDate = searchParams.get("date");
   const dateStr = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : todayStr;
 
-  // 1. Fetch medications and existing events
-  const medications = await getMedications(session.circleId);
-  const existingEvents = await getDoseEvents(session.circleId, dateStr);
+  // 1. Two reads in parallel: medications + all dose events (one query, filtered in memory)
+  const [medications, allEvents] = await Promise.all([
+    getMedications(session.circleId),
+    getAllDoseEvents(session.circleId),
+  ]);
+  const existingForDay = allEvents.filter((e) => e.scheduledDate === dateStr);
 
-  // 2. Reconcile and save newly generated doses if any
-  const dayDoses = buildDoseEventsForDay(medications, existingEvents, dateStr, session.circleId);
-  for (const dose of dayDoses) {
-    if (!existingEvents.some((e) => e.id === dose.id)) {
-      await saveDoseEvent(dose);
-    }
-  }
+  // 2. Reconcile the day's schedule and persist only the newly generated doses, in one batch
+  const dayDoses = buildDoseEventsForDay(medications, existingForDay, dateStr, session.circleId);
+  const existingIds = new Set(existingForDay.map((e) => e.id));
+  const newDoses = dayDoses.filter((d) => !existingIds.has(d.id));
+  await saveDoseEvents(newDoses);
 
-  // 3. Calculate full adherence metrics across all circle doses for trends
-  const allEvents = await getAllDoseEvents(session.circleId);
-  const metrics = calculateAdherenceMetrics(allEvents);
+  // 3. Adherence metrics only need the last 7 days
+  const weekStart = addDays(todayStr, -6);
+  const recentEvents = [...allEvents.filter((e) => e.scheduledDate >= weekStart && e.scheduledDate !== dateStr), ...dayDoses];
+  const metrics = calculateAdherenceMetrics(recentEvents);
 
   return NextResponse.json({
     date: dateStr,
@@ -76,9 +75,9 @@ export async function POST(req: NextRequest) {
       takenByMemberName: status === "taken" ? session.name : undefined,
     };
 
-    // Authorisation: a member may only change doses that belong to their own circle
-    const circleDoses = await getAllDoseEvents(session.circleId);
-    if (!circleDoses.some((d) => d.id === doseEventId)) {
+    // Authorisation: a member may only change doses that belong to their own circle (single-doc read)
+    const target = await getDoseEventById(doseEventId);
+    if (!target || target.circleId !== session.circleId) {
       return NextResponse.json({ error: "Dose event not found" }, { status: 404 });
     }
 

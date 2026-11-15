@@ -122,7 +122,11 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
     }
   }
 
-  function handleFieldChange(index: number, field: keyof ExtractedMedication, value: any) {
+  function handleFieldChange<K extends keyof ExtractedMedication>(
+    index: number,
+    field: K,
+    value: ExtractedMedication[K]
+  ) {
     const updated = [...extractedMeds];
     updated[index] = { ...updated[index], [field]: value };
     setExtractedMeds(updated);
@@ -142,38 +146,35 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
     setError(null);
 
     try {
-      // Save each medication via /api/medications (duplicates already in the plan are skipped)
-      let added = 0;
-      const skipped: string[] = [];
-      for (const med of extractedMeds) {
-        const payload = {
-          name: med.name,
-          dosage: med.dosage,
-          timesPerDay: med.timesPerDay || 1,
-          scheduleTimes: med.scheduleTimes || ["08:00"],
-          startDate: med.startDate || new Date().toLocaleDateString("en-CA"),
-          notes: med.notes || "",
-          instructions: med.instructions || "",
-          prescribedBy: med.prescribedBy || "",
-          active: true,
-        };
-
-        const res = await fetch("/api/medications", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.status === 409) {
-          skipped.push(med.name);
-          continue;
-        }
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `Failed saving ${med.name}`);
-        }
-        added++;
-      }
+      // Save all medications in parallel; ones already in the plan are reported as skipped (HTTP 409)
+      const results = await Promise.all(
+        extractedMeds.map(async (med) => {
+          const payload = {
+            name: med.name,
+            dosage: med.dosage,
+            timesPerDay: med.timesPerDay || 1,
+            scheduleTimes: med.scheduleTimes || ["08:00"],
+            startDate: med.startDate || new Date().toLocaleDateString("en-CA"),
+            notes: med.notes || "",
+            instructions: med.instructions || "",
+            prescribedBy: med.prescribedBy || "",
+            active: true,
+          };
+          const res = await fetch("/api/medications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.status === 409) return { name: med.name, status: "skipped" as const };
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Failed saving ${med.name}`);
+          }
+          return { name: med.name, status: "added" as const };
+        })
+      );
+      const added = results.filter((r) => r.status === "added").length;
+      const skipped = results.filter((r) => r.status === "skipped").map((r) => r.name);
 
       setSuccessMsg(
         `Added ${added} ${added === 1 ? "medicine" : "medicines"} to the plan` +

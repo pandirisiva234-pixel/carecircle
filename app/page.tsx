@@ -3,21 +3,8 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Role } from "@/lib/types";
-import {
-  Heart,
-  Shield,
-  Clock,
-  Sparkles,
-  Volume2,
-  Users,
-  CheckCircle2,
-  ArrowRight,
-  Lock,
-  Calendar,
-  AlertTriangle,
-  Stethoscope,
-  Pill,
-} from "lucide-react";
+import { StatStrip, FeatureGrid, HowItWorks, DemoLoginList } from "@/components/landing/LandingSections";
+import { Heart, Shield, AlertTriangle } from "lucide-react";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -241,87 +228,14 @@ export default function LandingPage() {
               CareCircle keeps elders at the center of their healthcare decisions while giving caretakers and family members shared visibility, automated escalation reminders, and Gemini AI prescription scanning.
             </p>
 
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 max-w-2xl">
-              {[
-                { k: "3 roles", v: "Elder · Caretaker · Family" },
-                { k: "1 tap", v: "to mark a dose taken" },
-                { k: "30 min", v: "before family is alerted" },
-                { k: "AI scan", v: "prescription → schedule" },
-              ].map((item) => (
-                <div key={item.k} className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 px-3 py-2.5 shadow-sm">
-                  <dt className="text-lg font-black text-slate-900 leading-tight">{item.k}</dt>
-                  <dd className="text-[11px] font-semibold text-slate-600 leading-snug">{item.v}</dd>
-                </div>
-              ))}
-            </dl>
+            <StatStrip />
           </div>
 
           {/* Key Value Highlights Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <div className="p-4 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm space-y-1.5 motion-safe:transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300">
-              <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-900 text-base">One-Tap Elder View</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Large buttons, high-contrast mode, and Web Speech API reading today&apos;s medicines out loud.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm space-y-1.5 motion-safe:transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300">
-              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-900 text-base">Gemini 3.8 Flash Vision</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Snap a photo of any prescription label to extract medicine names, dosages, and timings as structured JSON.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm space-y-1.5 motion-safe:transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                <Clock className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-900 text-base">15-Min Automated Escalation</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                GitHub Actions 15-min cron: reminds the elder first; escalates to family if still missed after 30 minutes.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm space-y-1.5 motion-safe:transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-900 text-base">Appointments & Activity Audit</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Doctor visit tracking with 24-hour advance email reminders and a transparent log of every change.
-              </p>
-            </div>
-          </div>
+          <FeatureGrid />
 
           {/* How it works */}
-          <section aria-labelledby="how-heading" className="rounded-3xl bg-white/80 backdrop-blur border border-slate-200 p-5 shadow-sm">
-            <h2 id="how-heading" className="text-xs font-bold uppercase tracking-wider text-sky-700">
-              How it works
-            </h2>
-            <ol className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { n: "1", t: "Create a circle", d: "Set up the elder's profile and invite family with a Circle ID and personal passcode." },
-                { n: "2", t: "Add or scan medicines", d: "Type them in, or snap the prescription and let Gemini fill the schedule for review." },
-                { n: "3", t: "Stay in the loop", d: "The elder taps Taken. If a dose is missed, the elder is reminded first, then family." },
-              ].map((step) => (
-                <li key={step.n} className="flex gap-3">
-                  <span className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-sky-600 to-emerald-500 text-white font-black flex items-center justify-center shadow-sm">
-                    {step.n}
-                  </span>
-                  <div>
-                    <p className="font-extrabold text-slate-900 text-sm">{step.t}</p>
-                    <p className="text-xs text-slate-600 leading-relaxed mt-0.5">{step.d}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
+          <HowItWorks />
         </div>
 
         {/* Right Column: Interactive Login & Demo Card */}
@@ -389,79 +303,7 @@ export default function LandingPage() {
                   </p>
                 </div>
 
-                <div className="space-y-2.5 pt-2">
-                  {/* Elder 1-Click Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin("elder")}
-                    disabled={loading}
-                    className="w-full p-4 rounded-2xl border-2 border-purple-200 hover:border-purple-400 bg-purple-50/60 hover:bg-purple-50 flex items-center justify-between text-left transition-all group"
-                  >
-                    <div className="flex items-center space-x-3.5">
-                      <span className="text-3xl" aria-hidden="true">👵</span>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-extrabold text-slate-900 text-base">Margaret Jenkins (Elder)</h3>
-                          <span className="text-[10px] bg-purple-200 text-purple-900 font-bold px-1.5 py-0.5 rounded">
-                            Passcode: 1234
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 mt-0.5">
-                          High contrast, voice read-aloud TTS, giant &quot;Taken&quot; buttons
-                        </p>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-purple-600 group-hover:translate-x-1 transition-transform" />
-                  </button>
-
-                  {/* Caretaker 1-Click Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin("caretaker")}
-                    disabled={loading}
-                    className="w-full p-4 rounded-2xl border-2 border-sky-200 hover:border-sky-400 bg-sky-50/60 hover:bg-sky-50 flex items-center justify-between text-left transition-all group"
-                  >
-                    <div className="flex items-center space-x-3.5">
-                      <span className="text-3xl" aria-hidden="true">👩‍⚕️</span>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-extrabold text-slate-900 text-base">Sarah Jenkins (Caretaker)</h3>
-                          <span className="text-[10px] bg-sky-200 text-sky-900 font-bold px-1.5 py-0.5 rounded">
-                            Passcode: 5678
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 mt-0.5">
-                          Manage medications, scan prescriptions, schedule appointments
-                        </p>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-sky-600 group-hover:translate-x-1 transition-transform" />
-                  </button>
-
-                  {/* Family 1-Click Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin("family")}
-                    disabled={loading}
-                    className="w-full p-4 rounded-2xl border-2 border-emerald-200 hover:border-emerald-400 bg-emerald-50/60 hover:bg-emerald-50 flex items-center justify-between text-left transition-all group"
-                  >
-                    <div className="flex items-center space-x-3.5">
-                      <span className="text-3xl" aria-hidden="true">👨‍👩‍👧</span>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-extrabold text-slate-900 text-base">David Jenkins (Family)</h3>
-                          <span className="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-1.5 py-0.5 rounded">
-                            Passcode: 9999
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 mt-0.5">
-                          Adherence tracking, receive missed dose escalations
-                        </p>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-emerald-600 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
+                <DemoLoginList loading={loading} onSelect={handleDemoLogin} />
               </div>
             )}
 
