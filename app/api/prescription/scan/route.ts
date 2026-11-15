@@ -12,13 +12,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { imageBase64, mimeType } = await req.json();
+    const { imageBase64, mimeType, isSample } = await req.json();
 
     if (!imageBase64) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
-    const result = await extractMedicationsFromImage(imageBase64, mimeType || "image/jpeg");
+    const result = await extractMedicationsFromImage(imageBase64, mimeType || "image/jpeg", {
+      isSample: isSample === true,
+    });
 
     if (!result.success) {
       return NextResponse.json(
@@ -42,6 +44,7 @@ export async function POST(req: NextRequest) {
       success: true,
       medications: result.data,
       rawSummary: result.rawText,
+      cached: result.cached === true,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);

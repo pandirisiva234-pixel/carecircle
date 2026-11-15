@@ -112,7 +112,7 @@ Next.js 15 (App Router, TypeScript) · React 19 · Tailwind CSS · Google Cloud 
 npm test
 ```
 
-**41 unit tests** across 5 suites (Vitest):
+**42 unit tests** across 5 suites (Vitest):
 
 | Suite | Covers |
 |---|---|

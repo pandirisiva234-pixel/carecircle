@@ -33,6 +33,8 @@ interface PrescriptionScannerProps {
 export function PrescriptionScanner({ onMedicationsAdded, highContrast }: PrescriptionScannerProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [usingSample, setUsingSample] = useState(false);
+  const [cachedNotice, setCachedNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
     }
 
     setError(null);
+    setUsingSample(false);
     setSelectedFile(file);
 
     const reader = new FileReader();
@@ -67,6 +70,7 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
       const blob = await res.blob();
       const file = new File([blob], "sample-prescription.png", { type: "image/png" });
       setSelectedFile(file);
+      setUsingSample(true);
       const reader = new FileReader();
       reader.onload = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
@@ -92,12 +96,12 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
       const res = await fetch("/api/prescription/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: dataUrl, mimeType }),
+        body: JSON.stringify({ imageBase64: dataUrl, mimeType, isSample: usingSample }),
       });
 
       // The platform can return a plain-text error page (e.g. timeout); never crash on it
       const raw = await res.text();
-      let data: { error?: string; medications?: ExtractedMedication[] } = {};
+      let data: { error?: string; medications?: ExtractedMedication[]; cached?: boolean; rawSummary?: string } = {};
       try {
         data = JSON.parse(raw);
       } catch {
@@ -107,6 +111,7 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
         throw new Error(data.error || "Failed to scan prescription");
       }
 
+      setCachedNotice(data.cached ? data.rawSummary || "Showing a saved result for the sample prescription." : null);
       setExtractedMeds(data.medications || []);
       setShowReview(true);
     } catch (err: unknown) {
@@ -311,6 +316,12 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
               Upload another image
             </button>
           </div>
+
+          {cachedNotice && (
+            <p role="status" className="text-xs font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              ⏳ {cachedNotice}
+            </p>
+          )}
 
           <div className="space-y-3">
             {extractedMeds.map((med, index) => (

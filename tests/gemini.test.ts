@@ -1,6 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { friendlyGeminiError, GEMINI_MODELS } from "../lib/gemini";
 
+import { sampleprescriptionResult } from "../lib/gemini";
+
+describe("Built-in sample prescription result", () => {
+  it("matches the 1-0-1 notation on the sample (morning / night times)", () => {
+    const meds = sampleprescriptionResult();
+    expect(meds.map((m) => m.name)).toEqual(["Amlodipine", "Metformin", "Pantoprazole", "Atorvastatin"]);
+    expect(meds.find((m) => m.name === "Metformin")?.scheduleTimes).toEqual(["08:00", "21:00"]);
+    expect(meds.every((m) => m.timesPerDay === m.scheduleTimes.length)).toBe(true);
+  });
+});
+
 describe("Gemini integration safeguards", () => {
   it("has a current default model and a fallback model", () => {
     expect(GEMINI_MODELS[0]).toBe(process.env.GEMINI_MODEL || "gemini-3.8-flash");
