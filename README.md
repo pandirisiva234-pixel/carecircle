@@ -1,238 +1,204 @@
 # CareCircle — Elderly Care & Medication Management Platform
 
-> **An elder-centered healthcare coordination platform built with Next.js 15, Tailwind CSS, Google Cloud Firestore, Gemini 2.5 Flash AI, and automated 15-minute GitHub Actions reminders.**
+> A shared care space where an elderly person, their caretaker and their family manage medicines, doctor visits and daily routines together. **The elder stays at the centre of every decision.**
 
-Deployable out-of-the-box to **Vercel** with a zero-crash in-memory fallback for judges, plus a production-ready **Dockerfile** for containerized environments.
+**🔗 Live app:** https://carecircle-topaz.vercel.app  
+**🩺 Health check:** https://carecircle-topaz.vercel.app/api/health
 
----
-
-## 📌 Problem
-
-- **The Polypharmacy Challenge**: Elderly adults frequently manage 4 to 8+ daily prescriptions with varied timings, dietary constraints, and specific instructions.
-- **Dose Non-Adherence & Adverse Reactions**: Missed doses or accidental double-dosing lead to avoidable hospitalizations and emergency visits.
-- **Disempowerment of the Elder**: Many care apps treat seniors as passive subjects rather than active participants in their own health choices.
-- **Caregiver Burnout & Fragmentation**: Caretakers and distant family members often have no real-time visibility into whether daily medicines were taken, leading to anxious phone calls or delayed intervention during emergencies.
-- **Complex Prescriptions**: Transcribing handwritten prescriptions and pharmacy bottle labels manually is error-prone and time-consuming.
+Built for **PromptWars × Catalyst** (Google for Developers × Hack2Skill). Challenge: *Elderly Care & Medication Management Platform*.
 
 ---
 
-## 💡 Solution
+## 🚀 Try it in 10 seconds (judges)
 
-**CareCircle** unifies the elder, their primary caretaker, and extended family members into a secure, synchronized care circle:
+Open the live app and click a card under **Judge Demo**. No sign-up needed.
 
-1. **Elder at the Centre**: The elder interacts with a high-contrast, large-button interface, receives audible voice announcements via the **Web Speech API**, and is immediately notified whenever anyone updates their schedule.
-2. **Gemini 2.5 Flash Prescription Scanner**: Upload a picture of a paper prescription or medicine box. Multimodal AI extracts medication names, dosages, and daily timings into structured JSON, which users review and confirm before saving.
-3. **Dual-Phase Escalation Engine**: An automated 15-minute cron job powered by **GitHub Actions** (`.github/workflows/reminders.yml`) sends gentle alerts to the elder first. If a critical dose remains unconfirmed after 30 minutes, it automatically escalates urgent notifications to caretakers and family members.
-4. **Adherence Dashboard**: Real-time compliance tracking, 7-day visual adherence charts, and appointment management with 24-hour email reminders.
+| Role | Person | Passcode | What to try |
+|---|---|---|---|
+| 👵 Elder | Margaret Jenkins | `1234` | Big "Taken" buttons, **Read Medicines Aloud**, High Contrast, progress ring |
+| 👩‍⚕️ Caretaker | Sarah Jenkins | `5678` | Add or edit medicines, **Gemini prescription scan**, appointments, run reminders |
+| 👨‍👩‍👧 Family | David Jenkins | `9999` | 7-day adherence chart, activity audit trail, missed-dose escalations |
 
----
-
-## 🚀 Live Demo Credentials for Judges
-
-Judges can explore CareCircle instantly without any manual configuration or credentials:
-
-- **Demo Circle ID**: `CC-DEMO`
-- **👵 Elder Account**: Margaret Jenkins (Age 78) — Passcode: `1234`
-  - *Experience the large high-contrast buttons, voice read-aloud TTS, and 1-tap "TAKEN" logging.*
-- **👩‍⚕️ Caretaker Account**: Sarah Jenkins (Daughter) — Passcode: `5678`
-  - *Manage medications, run Gemini AI prescription scans, schedule doctor visits.*
-- **👨‍👩‍👧 Family Account**: David Jenkins (Son) — Passcode: `9999`
-  - *Monitor adherence trends, review the activity audit trail, and receive escalation alerts.*
-
-*(Quick 1-click login buttons are also available directly on the homepage!)*
+Circle ID: `CC-DEMO`. Demo data is seeded into Firestore automatically and refreshed every day.
 
 ---
 
-## 🌟 Key Features
+## 📌 The problem
 
-### 1. Care Circle & Role-Based Access
-- Role-based permissions: `elder`, `caretaker`, and `family`.
-- Member passcodes securely hashed using **bcrypt**.
-- Tamper-proof, signed **httpOnly cookies** for session persistence.
-- Sliding-window in-memory **rate limiting** on authentication endpoints.
-- Full immutable **Activity Audit Log** capturing who changed what and when.
+- Older adults often take **4–8 medicines a day** at different times, and missed or doubled doses are a leading cause of avoidable hospital visits.
+- Families and caretakers **can't see** whether today's medicines were taken until something goes wrong.
+- Most care apps treat the elder as a **passive subject**: others change their schedule without telling them.
+- Copying handwritten prescriptions into an app by hand is slow and error-prone.
 
-### 2. Medication Management & Strict Validation
-- Create, edit, and delete medications with dosages, start/end dates, directions, and prescribing doctors.
-- Dynamic daily schedules (1 to 4 times per day with precise 24h timestamps).
-- **Zod schemas** enforce strict validation on all client and API inputs.
+## 💡 The solution
 
-### 3. Real-Time Adherence Tracking
-- Per-dose status tracking: `scheduled`, `taken`, and `missed`.
-- Interactive **7-Day Visual Adherence Chart** with performance ratings.
-- Real-time compliance percentage calculations based on scheduled vs. recorded doses.
+A **Care Circle** per elder, joined with a **Circle ID + personal passcode**. The elder, caretakers and family members each have a role, and everyone sees the same live schedule.
 
-### 4. Medical Appointments
-- Track provider visits with specialty, clinic location, and preparation notes.
-- Automated **24-hour advance email reminders** sent to all circle members.
-
-### 5. Automated Reminders & 15-Minute Escalation Cron
-- Protected endpoint: `POST /api/cron/reminders` (authenticated via `x-cron-secret` header).
-- Scheduled via **GitHub Actions** (`.github/workflows/reminders.yml`) running every 15 minutes.
-- **Three-Tier Notification Logic**:
-  1. **Upcoming Doses**: Gentle reminder to elder ~15-30 min before schedule.
-  2. **Missed Doses (Elder First)**: Gentle overdue alert sent directly to elder within 0-29 min overdue.
-  3. **Family Escalation**: If still missed after $\ge 30$ minutes, urgent escalation emails dispatched to family and caretakers.
-  4. **Appointments**: 24-hour advance appointment reminders.
-- **In-App Simulator**: Test the cron live directly from the dashboard!
-
-### 6. Gemini 2.5 Flash Prescription Scanner
-- Multimodal OCR via `@google/genai` utilizing the `gemini-2.5-flash` model.
-- Converts prescription images into validated clinical JSON arrays.
-- Interactive user review modal allowing edits before committing to the care plan.
-- Includes sample prescription demo loader for rapid judge evaluation.
-
-### 7. Elder Mode & Accessibility (WCAG Compliant)
-- **Extra-large typography** (`text-elder-xl`) and simplified card layouts.
-- **High-contrast toggle** meeting WCAG contrast ratio standards.
-- **Web Speech API Text-to-Speech (TTS)**: Plays audio summaries of today's medications with Play, Pause, Resume, and Stop controls.
-- **Elder Centrality**: Alerts the elder whenever caretakers or family modify care plans.
-- One-tap emergency contact calling button.
+| | What it does | Why it matters |
+|---|---|---|
+| 👵 **Elder-first design** | Large text, one-tap "Taken", high contrast, **voice read-aloud** of today's medicines | The person taking the medicine can use the app without help |
+| 🔔 **"You're in control" notices** | When anyone changes the elder's schedule, the elder sees *who* changed *what* | The elder stays at the centre of their own care decisions |
+| 📸 **Gemini prescription scan** | Photo of a prescription → **Gemini 2.5 Flash** extracts medicines, doses and times as JSON → a human reviews before saving | Removes manual typing errors; AI suggests, a person confirms |
+| 🚨 **Two-step escalation** | A dose 0–30 min late reminds the **elder** first; still missed after 30 min, it alerts **caretaker and family** by email | Gentle for the elder, and family only gets alerted when it matters |
+| 📊 **Adherence tracking** | Today's progress ring, adherence %, 7-day trend | Spot problems early |
+| 📅 **Appointments** | Doctor visits with an email reminder 24 hours before | Visits aren't forgotten |
+| 🧾 **Activity audit log** | Every change records who, what and when | Trust and accountability inside the family |
+| 🌏 **Timezone-correct** | All schedules run in the elder's local time (default `Asia/Kolkata`) even though servers run in UTC | "8:00 AM" really means 8:00 AM for the elder |
 
 ---
 
-## 🏗 Architecture & Cloud Services
+## ☁️ Google services used
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    CareCircle Client (Next.js 15)            │
-│       WCAG Accessible UI • High Contrast • Web Speech API    │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ HTTP / JSON
-┌──────────────────────────────▼───────────────────────────────┐
-│              Vercel Serverless / Docker Standalone            │
-│  - Next.js 15 App Router API Routes                          │
-│  - Signed Session Cookies & Sliding-Window Rate Limiting     │
-│  - Security Headers (HSTS, CSP, X-Frame-Options, Sniffing)   │
-└──────┬───────────────────────┬───────────────────────┬───────┘
-       │                       │                       │
-┌──────▼─────────────┐ ┌───────▼───────────────┐ ┌─────▼────────────────┐
-│ Google Cloud       │ │ Google Gemini API     │ │ GitHub Actions       │
-│ Firestore          │ │ Model:                │ │ (.github/workflows/  │
-│ (firebase-admin)   │ │ gemini-2.5-flash      │ │  reminders.yml)      │
-│ In-memory zero-    │ │ Prescription Vision   │ │ Every 15 minutes     │
-│ crash fallback     │ │ JSON Extraction       │ │                      │
-└────────────────────┘ └───────────────────────┘ └─────┬────────────────┘
-                                                       │
-                                               ┌───────▼────────────────┐
-                                               │ Gmail SMTP             │
-                                               │ (Nodemailer)           │
-                                               │ Alerts & Escalations   │
-                                               └────────────────────────┘
+| Service | Used for |
+|---|---|
+| **Gemini 2.5 Flash** (`@google/genai`) | Multimodal prescription image → structured medication JSON |
+| **Google Cloud Firestore** (`firebase-admin`) | All circles, members, medications, dose events, appointments and audit logs |
+| **Firebase** (project + service account) | Secure server-side database access (production-mode rules: no direct client access) |
+| **Gmail SMTP** (Nodemailer) | Dose, missed-dose escalation and appointment reminder emails |
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+  subgraph Users
+    E[👵 Elder] --- C[👩‍⚕️ Caretaker] --- F[👨‍👩‍👧 Family]
+  end
+  Users -->|HTTPS| UI[Next.js 15 App Router UI<br/>Tailwind · WCAG]
+  UI --> API[Next.js API routes<br/>zod validation · signed httpOnly session]
+  API --> DB[(Google Cloud Firestore)]
+  API --> GEM[Gemini 2.5 Flash<br/>prescription vision]
+  API --> MAIL[Gmail SMTP<br/>reminder emails]
+  GH[GitHub Actions<br/>every 15 min] -->|x-cron-secret| CRON[/api/cron/reminders/]
+  CRON --> DB
+  CRON --> MAIL
 ```
 
----
+- **Hosting:** Vercel serverless functions in `bom1` (Mumbai), next to the Firestore region. A `Dockerfile` (standalone output) is included for Google Cloud Run.
+- **Scheduler:** GitHub Actions calls `/api/cron/reminders` every 15 minutes with a secret header.
+- **Resilience:** every Firestore call has a timeout and falls back to an in-memory demo store, so the demo never crashes.
 
-## 🛠 Tech Stack
+## 🧰 Tech stack
 
-- **Framework**: Next.js 15 (App Router, TypeScript, React 19)
-- **Styling**: Tailwind CSS with custom elder accessibility tokens
-- **Database**: Google Cloud Firestore (`firebase-admin`) with zero-crash in-memory fallback
-- **Artificial Intelligence**: Google Gemini API (`@google/genai`, model `gemini-2.5-flash`)
-- **Email Engine**: Nodemailer with Gmail SMTP
-- **Scheduled Automation**: GitHub Actions workflow cron (`reminders.yml`)
-- **Security**: Bcrypt password hashing, HMAC-SHA256 signed cookies, rate limiting
-- **Validation**: Zod
-- **Icons**: Lucide React
-- **Testing**: Vitest unit test suite
+Next.js 15 (App Router, TypeScript) · React 19 · Tailwind CSS · Google Cloud Firestore · Gemini 2.5 Flash · Nodemailer · zod · bcryptjs · Vitest · GitHub Actions
 
 ---
 
-## ⚡ Deployment to Vercel (Recommended)
+## 🔒 Security
 
-CareCircle works on **Vercel** completely out-of-the-box!
+- Passcodes hashed with **bcrypt**; never stored or logged in plain text.
+- Sessions are **HMAC-SHA256 signed, httpOnly, SameSite=Lax** cookies with expiry; tampered tokens are rejected (tested).
+- Production refuses to run without a strong `SESSION_SECRET`.
+- **Rate limiting** on login (5 attempts / 15 min).
+- **Circle isolation:** every read and write checks that the record belongs to the signed-in member's circle.
+- **zod** validation on every API input (time formats, dates, lengths, roles, statuses).
+- Cron and seed endpoints need a secret header, compared with `timingSafeEqual`. The secret is never sent to the browser; the in-app "run reminders" button is authorised by the caretaker/family session instead.
+- Firestore is in **production mode** (no public reads/writes); only the server, using a service account, can access data.
+- Secrets live only in environment variables; `.env*` is git-ignored and `.env.example` documents them.
+- Security headers via `next.config.ts` and `vercel.json`.
 
-### Step 1: Deploy with Vercel Git Integration
-1. Push your repository to GitHub.
-2. In the [Vercel Dashboard](https://vercel.com/new), import your `carecircle` repository.
-3. Framework Preset: **Next.js** (automatically detected).
-4. Root Directory: `./`
+## ♿ Accessibility
 
-### Step 2: Configure Environment Variables in Vercel
-In **Vercel Project Settings → Environment Variables**, add:
+- Elder Mode: large type, oversized tap targets, one primary action per card.
+- **High-contrast mode** and full keyboard navigation with visible focus states.
+- **Text-to-speech** of today's medicines (Web Speech API).
+- Semantic landmarks, `aria-label`s on icon buttons, a live status line for screen readers, and a skip-to-content link.
+- Respects `prefers-reduced-motion`.
 
-| Variable | Description | Example / Note |
-| :--- | :--- | :--- |
-| `SESSION_SECRET` | 32+ char secret for signed session cookies | `carecircle-secure-secret-key-32-chars` |
-| `CRON_SECRET` | Secret token protecting the reminders endpoint | `my-secure-cron-secret-12345` |
-| `APP_URL` | Your public Vercel domain URL | `https://your-carecircle.vercel.app` |
-| `GEMINI_API_KEY` | Google Gemini API Key | From [Google AI Studio](https://aistudio.google.com/app/apikey) |
-| `FIREBASE_PROJECT_ID` | Google Cloud / Firebase Project ID | `your-firebase-project-id` |
-| `FIREBASE_CLIENT_EMAIL` | Service Account client email | `firebase-adminsdk@your-project.iam.gserviceaccount.com` |
-| `FIREBASE_PRIVATE_KEY` | Service Account private key | `-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n` |
-| `GMAIL_USER` | Gmail address for clinical alerts | `your.email@gmail.com` |
-| `GMAIL_APP_PASSWORD` | 16-character Gmail App Password | From Google Account Security |
-
-> **Zero-Crash Demo Guarantee for Judges**: If `FIREBASE_*` variables are not yet configured, CareCircle seamlessly falls back to an in-memory store pre-seeded with the demo circle (`CC-DEMO`). The app will **never crash** on Vercel even without external GCP credentials!
-
-### Step 3: Configure GitHub Actions 15-Minute Cron
-CareCircle includes [.github/workflows/reminders.yml](file:///.github/workflows/reminders.yml) which triggers every 15 minutes:
-
-1. In your GitHub repository, navigate to **Settings → Secrets and variables → Actions**.
-2. Click **New repository secret** and add:
-   - `APP_URL`: Your live Vercel app URL (e.g. `https://your-carecircle.vercel.app`).
-   - `CRON_SECRET`: Same token set in your Vercel `CRON_SECRET`.
-3. The workflow will automatically run every 15 minutes and can also be triggered manually under the **Actions** tab with the **"Run workflow"** button.
-
----
-
-## 🐳 Optional: Docker & Cloud Run Deployment
-
-CareCircle also includes a production multi-stage `Dockerfile` with `output: "standalone"`:
+## 🧪 Testing
 
 ```bash
-# Build Docker image
-docker build -t carecircle .
-
-# Run container locally on port 8080
-docker run -p 8080:8080 --env-file .env.local carecircle
+npm test
 ```
 
-Or deploy to Google Cloud Run:
-```bash
-gcloud builds submit --tag gcr.io/<PROJECT_ID>/carecircle
-gcloud run deploy carecircle --image gcr.io/<PROJECT_ID>/carecircle --platform managed --region us-central1 --allow-unauthenticated
-```
+**38 unit tests** across 4 suites (Vitest):
+
+| Suite | Covers |
+|---|---|
+| `adherence.test.ts` | Dose generation per day, date ranges, inactive medicines, adherence %, 7-day trend, escalation thresholds |
+| `timezone.test.ts` | IST vs UTC day boundaries, 8:00 IST → 02:30 UTC, DST zones, month/year rollovers, deterministic dose IDs |
+| `auth.test.ts` | Session signing, **tamper and role-escalation rejection**, expiry, bcrypt hashing, rate limiting |
+| `validations.test.ts` | Invalid times and dates, limits, unknown roles, email requirements, dose statuses |
+
+## 📈 Scalability
+
+- Stateless serverless API; scales horizontally on Vercel or Cloud Run.
+- Firestore queries use **equality filters only** (sorting in code), so they need no composite indexes and scale with the data.
+- **Deterministic dose IDs** (`dose-{med}-{date}-{time}`) make reconciliation idempotent: repeated or parallel requests never create duplicate doses.
+- Seeding and reminders are idempotent and safe to retry.
+- Next steps: Firestore batched reads for many circles, Cloud Tasks / Pub/Sub for fan-out reminders, FCM push notifications, SMS/WhatsApp for elders without email.
 
 ---
 
-## 💻 Local Development
+## ⚙️ Run locally
 
-### 1. Install Dependencies
 ```bash
+git clone https://github.com/pandirisiva234-pixel/carecircle.git
+cd carecircle
 npm install
+cp .env.example .env.local   # fill in your values
+npm run dev                  # http://localhost:3000
 ```
 
-### 2. Configure Local Environment
-```bash
-cp .env.example .env.local
+Without Firebase credentials, the app runs with the in-memory demo store, so it works out of the box.
+
+### Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `SESSION_SECRET` | 32+ char secret for signing sessions |
+| `CRON_SECRET` | Secret header for `/api/cron/reminders` and `/api/seed` |
+| `GEMINI_API_KEY` | Google AI Studio key for prescription scanning |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Firestore service account |
+| `GMAIL_USER`, `GMAIL_APP_PASSWORD` | Sending reminder emails |
+| `APP_URL`, `NEXT_PUBLIC_APP_URL` | Public URL of the app |
+| `APP_TIMEZONE` | Schedule timezone (default `Asia/Kolkata`) |
+
+### Deploy
+
+1. Import the repo in **Vercel** and paste the environment variables.
+2. In GitHub → Settings → Secrets → Actions, add `APP_URL` and `CRON_SECRET` to enable the 15-minute reminder workflow.
+3. (Optional) Deploy the same image to **Google Cloud Run** with the included `Dockerfile`.
+
+## 🗂️ Project structure
+
+```
+app/
+  page.tsx                 Landing page + judge demo login
+  dashboard/page.tsx       Elder / caretaker / family dashboard
+  api/
+    auth/                  create-circle, join-circle, login, demo-login, me, logout
+    medications/ doses/    Medication CRUD + daily dose tracking
+    appointments/          Appointment CRUD
+    prescription/scan/     Gemini prescription extraction
+    cron/reminders/        Reminder + escalation engine (GitHub Actions)
+    seed/ health/          Demo seeding, status check
+components/                DoseCard, TodayProgress, AdherenceChart, PrescriptionScanner, ...
+lib/
+  db.ts                    Firestore data layer (timeouts + in-memory fallback + seeding)
+  adherence.ts             Scheduling, adherence and escalation logic (pure, tested)
+  timezone.ts              Timezone-safe date helpers (pure, tested)
+  auth.ts                  Sessions, bcrypt, rate limiting
+  gemini.ts  email.ts      Google AI + email integrations
+  validations.ts           zod schemas
+tests/                     Vitest suites
+.github/workflows/         15-minute reminders workflow
 ```
 
-### 3. Run Development Server
-```bash
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+## 🔌 API overview
+
+| Method | Route | Auth |
+|---|---|---|
+| POST | `/api/auth/demo-login`, `/api/auth/login`, `/api/auth/create-circle`, `/api/auth/join-circle` | Public (rate-limited) |
+| GET/POST | `/api/medications`, `/api/doses`, `/api/appointments` | Session |
+| PUT/DELETE | `/api/medications/[id]`, `/api/appointments/[id]` | Session, own circle only |
+| POST | `/api/prescription/scan` | Session |
+| GET | `/api/activity` | Session |
+| POST | `/api/cron/reminders` | `x-cron-secret` or caretaker/family session |
+| POST | `/api/seed` | `x-cron-secret` |
+| GET | `/api/health` | Public (no secrets) |
 
 ---
 
-## 🧪 Running Unit Tests
-
-Run the Vitest test suite covering scheduling, adherence calculations, and reminder escalation logic:
-
-```bash
-npm run test
-```
-
-Expected output:
-```
- ✓ tests/adherence.test.ts (9 tests)
- Test Files  1 passed (1)
-      Tests  9 passed (9)
-```
-
----
-
-## 📄 License
-
-MIT License. Designed with care for elderly autonomy and family peace of mind.
+Built by **Pandiri Sivaramakrishna** · MCA (AI & ML), Chanakya University

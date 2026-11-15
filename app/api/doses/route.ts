@@ -76,6 +76,12 @@ export async function POST(req: NextRequest) {
       takenByMemberName: status === "taken" ? session.name : undefined,
     };
 
+    // Authorisation: a member may only change doses that belong to their own circle
+    const circleDoses = await getAllDoseEvents(session.circleId);
+    if (!circleDoses.some((d) => d.id === doseEventId)) {
+      return NextResponse.json({ error: "Dose event not found" }, { status: 404 });
+    }
+
     const updated = await updateDoseEvent(doseEventId, updates);
     if (!updated) {
       return NextResponse.json({ error: "Dose event not found" }, { status: 404 });
