@@ -29,17 +29,46 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * - busy / rate-limited (503)  → retry with backoff, then try the next model
  * Total worst-case wait stays well inside a serverless request timeout.
  */
+const ATTEMPT_TIMEOUT_MS = 22000; // one Gemini call
+const TOTAL_BUDGET_MS = 50000; // stays inside the 60s serverless limit
+
+function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`UNAVAILABLE: Gemini call timed out after ${ms}ms`)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
+  });
+}
+
 async function generateWithModelFallback(ai: GoogleGenAI, params: GenerateParams) {
   let lastError: unknown;
+  const startedAt = Date.now();
   for (const model of GEMINI_MODELS) {
     for (let attempt = 0; attempt < 2; attempt++) {
+      const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
+      if (remaining < 3000) throw lastError ?? new Error("UNAVAILABLE: Gemini time budget exhausted");
       try {
-        return await ai.models.generateContent({ ...params, model });
+        return await withDeadline(
+          ai.models.generateContent({ ...params, model }),
+          Math.min(ATTEMPT_TIMEOUT_MS, remaining)
+        );
       } catch (err) {
         lastError = err;
         if (isModelUnavailable(err) && !isTransientOverload(err)) {
           console.warn(`[Gemini API] Model ${model} unavailable, trying next model.`);
           break;
+        }
+        if (/timed out/i.test(err instanceof Error ? err.message : String(err))) {
+          console.warn(`[Gemini API] Model ${model} timed out, trying next model.`);
+          break; // a slow model rarely gets faster on retry; move to the backup model
         }
         if (isTransientOverload(err)) {
           console.warn(`[Gemini API] Model ${model} busy (attempt ${attempt + 1}), retrying.`);

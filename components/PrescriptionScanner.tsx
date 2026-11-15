@@ -4,6 +4,27 @@ import React, { useState } from "react";
 import { ExtractedMedication } from "@/lib/types";
 import { Sparkles, Upload, FileText, Check, Plus, Trash2, AlertCircle } from "lucide-react";
 
+/** Resizes an image data URL to at most `maxSide` px and re-encodes it as JPEG. */
+async function downscaleImage(dataUrl: string, maxSide = 1600): Promise<{ dataUrl: string; mimeType: string }> {
+  try {
+    const img = new Image();
+    img.src = dataUrl;
+    await img.decode();
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { dataUrl, mimeType: dataUrl.slice(5, dataUrl.indexOf(";")) || "image/jpeg" };
+    ctx.fillStyle = "#ffffff"; // flatten transparency onto white paper
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return { dataUrl: canvas.toDataURL("image/jpeg", 0.85), mimeType: "image/jpeg" };
+  } catch {
+    return { dataUrl, mimeType: dataUrl.slice(5, dataUrl.indexOf(";")) || "image/jpeg" };
+  }
+}
+
 interface PrescriptionScannerProps {
   onMedicationsAdded: () => void;
   highContrast?: boolean;
@@ -38,15 +59,20 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
     reader.readAsDataURL(file);
   }
 
-  // Pre-loaded sample prescription helper for judges
-  function handleUseSamplePrescription() {
+  // Pre-loaded sample prescription for judges (a clearly labelled demo document in /public)
+  async function handleUseSamplePrescription() {
     setError(null);
-    // 1x1 transparent placeholder or SVG represented as data URL
-    const sampleDataUrl =
-      "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><rect width='400' height='300' fill='%23f8fafc'/><text x='20' y='40' font-family='sans-serif' font-size='16' font-weight='bold' fill='%230f172a'>Rx Medical Prescription</text><text x='20' y='70' font-family='sans-serif' font-size='12' fill='%23475569'>Patient: Margaret Jenkins (Age 78)</text><text x='20' y='110' font-family='sans-serif' font-size='14' fill='%230284c7'>1. Lisinopril 10mg - 1 tab daily (morning)</text><text x='20' y='140' font-family='sans-serif' font-size='14' fill='%230284c7'>2. Atorvastatin 20mg - 1 tab at bedtime</text><text x='20' y='170' font-family='sans-serif' font-size='14' fill='%230284c7'>3. Metformin 500mg - 1 tab twice daily with meals</text><text x='20' y='220' font-family='sans-serif' font-size='12' fill='%2364748b'>Signed: Dr. Evelyn Thorne, MD (Cardiology)</text></svg>";
-
-    setImagePreview(sampleDataUrl);
-    setSelectedFile(new File(["sample"], "sample-prescription.png", { type: "image/png" }));
+    try {
+      const res = await fetch("/sample-prescription.png");
+      const blob = await res.blob();
+      const file = new File([blob], "sample-prescription.png", { type: "image/png" });
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    } catch {
+      setError("Could not load the sample prescription. Please upload a photo instead.");
+    }
   }
 
   async function handleScan() {
@@ -60,16 +86,23 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
     setSuccessMsg(null);
 
     try {
+      // Phone photos can be 5–10 MB; shrink before upload for speed and to stay under request limits
+      const { dataUrl, mimeType } = await downscaleImage(imagePreview);
+
       const res = await fetch("/api/prescription/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64: imagePreview,
-          mimeType: selectedFile?.type || "image/jpeg",
-        }),
+        body: JSON.stringify({ imageBase64: dataUrl, mimeType }),
       });
 
-      const data = await res.json();
+      // The platform can return a plain-text error page (e.g. timeout); never crash on it
+      const raw = await res.text();
+      let data: { error?: string; medications?: ExtractedMedication[] } = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error("The AI scan took too long. Please try again in a moment.");
+      }
       if (!res.ok) {
         throw new Error(data.error || "Failed to scan prescription");
       }
@@ -111,7 +144,7 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
           dosage: med.dosage,
           timesPerDay: med.timesPerDay || 1,
           scheduleTimes: med.scheduleTimes || ["08:00"],
-          startDate: med.startDate || new Date().toISOString().split("T")[0],
+          startDate: med.startDate || new Date().toLocaleDateString("en-CA"),
           notes: med.notes || "",
           instructions: med.instructions || "",
           prescribedBy: med.prescribedBy || "",
