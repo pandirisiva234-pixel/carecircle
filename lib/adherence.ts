@@ -1,4 +1,5 @@
-import { DoseEvent, Medication, DoseStatus } from "./types";
+import { DoseEvent, Medication } from "./types";
+import { DEFAULT_TIMEZONE, zonedTimeToUtcIso, todayInTz, addDays, weekdayLabel } from "./timezone";
 
 export interface DayAdherence {
   date: string; // YYYY-MM-DD
@@ -25,7 +26,8 @@ export function buildDoseEventsForDay(
   medications: Medication[],
   existingEvents: DoseEvent[],
   dateStr: string, // YYYY-MM-DD
-  circleId: string
+  circleId: string,
+  timeZone: string = DEFAULT_TIMEZONE
 ): DoseEvent[] {
   const existingMap = new Map<string, DoseEvent>();
   for (const ev of existingEvents) {
@@ -51,9 +53,11 @@ export function buildDoseEventsForDay(
       if (existing) {
         generated.push(existing);
       } else {
-        const scheduledTimeIso = `${dateStr}T${timeLocal}:00.000Z`;
+        // Schedule times are wall-clock times in the elder's timezone
+        const scheduledTimeIso = zonedTimeToUtcIso(dateStr, timeLocal, timeZone);
         const newEvent: DoseEvent = {
-          id: `dose-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          // Deterministic id: one dose per medication, day and time slot (prevents duplicates)
+          id: `dose-${med.id}-${dateStr}-${timeLocal.replace(":", "")}`,
           circleId,
           medicationId: med.id,
           medicationName: med.name,
@@ -77,7 +81,10 @@ export function buildDoseEventsForDay(
 /**
  * Computes adherence metrics from a list of dose events
  */
-export function calculateAdherenceMetrics(events: DoseEvent[]): AdherenceSummary {
+export function calculateAdherenceMetrics(
+  events: DoseEvent[],
+  timeZone: string = DEFAULT_TIMEZONE
+): AdherenceSummary {
   const totalDoses = events.length;
   let takenDoses = 0;
   let missedDoses = 0;
@@ -98,7 +105,7 @@ export function calculateAdherenceMetrics(events: DoseEvent[]): AdherenceSummary
   const overallRate = completedOrMissed > 0 ? Math.round((takenDoses / completedOrMissed) * 100) : 100;
 
   // Build 7-day trend
-  const weeklyTrend = compute7DayTrend(events);
+  const weeklyTrend = compute7DayTrend(events, new Date(), timeZone);
 
   return {
     totalDoses,
@@ -113,32 +120,26 @@ export function calculateAdherenceMetrics(events: DoseEvent[]): AdherenceSummary
 /**
  * Computes day-by-day metrics for the last 7 calendar days
  */
-export function compute7DayTrend(events: DoseEvent[], baseDate = new Date()): DayAdherence[] {
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export function compute7DayTrend(
+  events: DoseEvent[],
+  baseDate = new Date(),
+  timeZone: string = DEFAULT_TIMEZONE
+): DayAdherence[] {
   const trend: DayAdherence[] = [];
+  const today = todayInTz(baseDate, timeZone);
 
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(baseDate);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split("T")[0];
-    const dayLabel = dayNames[d.getDay()];
-
+    const dateStr = addDays(today, -i);
     const daysEvents = events.filter((e) => e.scheduledDate === dateStr);
     const total = daysEvents.length;
     const taken = daysEvents.filter((e) => e.status === "taken").length;
     const missed = daysEvents.filter((e) => e.status === "missed").length;
 
+    // Rate counts only resolved doses; a day with nothing resolved yet is 100%
     const denominator = taken + missed;
-    const rate = denominator > 0 ? Math.round((taken / denominator) * 100) : total > 0 && taken === total ? 100 : 100;
+    const rate = denominator > 0 ? Math.round((taken / denominator) * 100) : 100;
 
-    trend.push({
-      date: dateStr,
-      dayLabel,
-      total,
-      taken,
-      missed,
-      rate,
-    });
+    trend.push({ date: dateStr, dayLabel: weekdayLabel(dateStr), total, taken, missed, rate });
   }
 
   return trend;
@@ -172,7 +173,7 @@ export function evaluateDoseEscalation(
     // Parse scheduled ISO time or construct from scheduledDate and scheduledTimeLocal
     const schedDate = new Date(ev.scheduledTime);
     const scheduledMs = isNaN(schedDate.getTime())
-      ? new Date(`${ev.scheduledDate}T${ev.scheduledTimeLocal}:00`).getTime()
+      ? new Date(zonedTimeToUtcIso(ev.scheduledDate, ev.scheduledTimeLocal)).getTime()
       : schedDate.getTime();
 
     const diffMinutes = Math.floor((currentMs - scheduledMs) / (1000 * 60));

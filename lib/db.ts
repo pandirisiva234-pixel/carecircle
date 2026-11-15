@@ -11,22 +11,55 @@ import {
   ActivityLog,
   Role,
 } from "./types";
+import { DEFAULT_TIMEZONE, todayInTz, addDays, zonedTimeToUtcIso } from "./timezone";
 
 // ==========================================
 // 1. Firebase Admin Initialization (Firestore)
 // ==========================================
+
+/** Strips accidental wrapping quotes/whitespace from env values pasted into hosting dashboards. */
+function cleanEnv(value: string | undefined): string | undefined {
+  if (!value) return value;
+  const trimmed = value.trim();
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+/** Firestore calls must never hang a serverless function; fall back to memory after a timeout. */
+const FIRESTORE_TIMEOUT_MS = 6000;
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`[CareCircle DB] Firestore ${label} timed out after ${FIRESTORE_TIMEOUT_MS}ms`)),
+      FIRESTORE_TIMEOUT_MS
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
+  });
+}
 let firestoreDb: admin.firestore.Firestore | null = null;
 let useFirebase = false;
 
 function initFirestore(): admin.firestore.Firestore | null {
   if (firestoreDb) return firestoreDb;
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
-
-  // Handle escaped \n in the private key as required
-  const privateKey = rawPrivateKey?.replace(/\\n/g, "\n");
+  const projectId = cleanEnv(process.env.FIREBASE_PROJECT_ID);
+  const clientEmail = cleanEnv(process.env.FIREBASE_CLIENT_EMAIL);
+  // Handle escaped \n in the private key (common when pasted into hosting dashboards)
+  const privateKey = cleanEnv(process.env.FIREBASE_PRIVATE_KEY)?.replace(/\\n/g, "\n");
 
   // If any required Firestore credential is missing, gracefully fall back to in-memory store
   if (!projectId || !clientEmail || !privateKey) {
@@ -81,7 +114,9 @@ interface StoreSchema {
 function getInitialDemoData(): StoreSchema {
   const salt = bcrypt.genSaltSync(10);
   const now = new Date().toISOString();
-  const today = new Date().toISOString().split("T")[0];
+  const tz = DEFAULT_TIMEZONE;
+  const today = todayInTz(new Date(), tz);
+  const at = (date: string, time: string) => zonedTimeToUtcIso(date, time, tz);
 
   const circle: Circle = {
     id: "CC-DEMO",
@@ -189,71 +224,71 @@ function getInitialDemoData(): StoreSchema {
   };
 
   const doseEvents: Record<string, DoseEvent> = {
-    "dose-1": {
-      id: "dose-1",
+    [`dose-med-1-${today}-0800`]: {
+      id: `dose-med-1-${today}-0800`,
       circleId: "CC-DEMO",
       medicationId: "med-1",
       medicationName: "Amlodipine",
       dosage: "5mg (1 tablet)",
-      scheduledTime: `${today}T08:00:00.000Z`,
+      scheduledTime: at(today, "08:00"),
       scheduledTimeLocal: "08:00",
       scheduledDate: today,
       status: "taken",
-      takenAt: `${today}T08:05:00.000Z`,
+      takenAt: at(today, "08:05"),
       takenByMemberId: "mem-elder",
       takenByMemberName: "Margaret Jenkins",
       createdAt: now,
       updatedAt: now,
     },
-    "dose-2": {
-      id: "dose-2",
+    [`dose-med-2-${today}-0830`]: {
+      id: `dose-med-2-${today}-0830`,
       circleId: "CC-DEMO",
       medicationId: "med-2",
       medicationName: "Metformin",
       dosage: "500mg (1 tablet)",
-      scheduledTime: `${today}T08:30:00.000Z`,
+      scheduledTime: at(today, "08:30"),
       scheduledTimeLocal: "08:30",
       scheduledDate: today,
       status: "taken",
-      takenAt: `${today}T08:35:00.000Z`,
+      takenAt: at(today, "08:35"),
       takenByMemberId: "mem-elder",
       takenByMemberName: "Margaret Jenkins",
       createdAt: now,
       updatedAt: now,
     },
-    "dose-3": {
-      id: "dose-3",
+    [`dose-med-3-${today}-1300`]: {
+      id: `dose-med-3-${today}-1300`,
       circleId: "CC-DEMO",
       medicationId: "med-3",
       medicationName: "Glucosamine & Chondroitin",
       dosage: "1500mg",
-      scheduledTime: `${today}T13:00:00.000Z`,
+      scheduledTime: at(today, "13:00"),
       scheduledTimeLocal: "13:00",
       scheduledDate: today,
       status: "scheduled",
       createdAt: now,
       updatedAt: now,
     },
-    "dose-4": {
-      id: "dose-4",
+    [`dose-med-2-${today}-2000`]: {
+      id: `dose-med-2-${today}-2000`,
       circleId: "CC-DEMO",
       medicationId: "med-2",
       medicationName: "Metformin",
       dosage: "500mg (1 tablet)",
-      scheduledTime: `${today}T20:00:00.000Z`,
+      scheduledTime: at(today, "20:00"),
       scheduledTimeLocal: "20:00",
       scheduledDate: today,
       status: "scheduled",
       createdAt: now,
       updatedAt: now,
     },
-    "dose-5": {
-      id: "dose-5",
+    [`dose-med-4-${today}-2100`]: {
+      id: `dose-med-4-${today}-2100`,
       circleId: "CC-DEMO",
       medicationId: "med-4",
       medicationName: "Atorvastatin",
       dosage: "20mg (1 tablet)",
-      scheduledTime: `${today}T21:00:00.000Z`,
+      scheduledTime: at(today, "21:00"),
       scheduledTimeLocal: "21:00",
       scheduledDate: today,
       status: "scheduled",
@@ -262,13 +297,8 @@ function getInitialDemoData(): StoreSchema {
     },
   };
 
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowDateStr = tomorrow.toISOString().split("T")[0];
-
-  const nextWeek = new Date();
-  nextWeek.setDate(nextWeek.getDate() + 7);
-  const nextWeekDateStr = nextWeek.toISOString().split("T")[0];
+  const tomorrowDateStr = addDays(today, 1);
+  const nextWeekDateStr = addDays(today, 7);
 
   const appointments: Record<string, Appointment> = {
     "apt-1": {
@@ -276,7 +306,7 @@ function getInitialDemoData(): StoreSchema {
       circleId: "CC-DEMO",
       doctor: "Dr. Evelyn Thorne",
       specialty: "Cardiology",
-      dateTime: `${tomorrowDateStr}T10:30:00`,
+      dateTime: at(tomorrowDateStr, "10:30"),
       location: "Heart & Vascular Center, Suite 402, St. Jude Medical Pavilion",
       notes: "Follow-up blood pressure check and lipid panel review. Bring log of morning readings.",
       createdAt: now,
@@ -287,7 +317,7 @@ function getInitialDemoData(): StoreSchema {
       circleId: "CC-DEMO",
       doctor: "Dr. Marcus Vance",
       specialty: "Optometry & Ophthalmology",
-      dateTime: `${nextWeekDateStr}T14:15:00`,
+      dateTime: at(nextWeekDateStr, "14:15"),
       location: "Clarity Vision Clinic, 804 Elm St",
       notes: "Annual diabetic retinal exam. Pupil dilation planned, Sarah will drive.",
       createdAt: now,
@@ -326,7 +356,7 @@ function getInitialDemoData(): StoreSchema {
       memberRole: "elder",
       action: "DOSE_TAKEN",
       details: "Took Amlodipine 5mg on time",
-      timestamp: `${today}T08:05:00.000Z`,
+      timestamp: at(today, "08:05"),
       affectsElder: true,
     },
     "act-4": {
@@ -337,7 +367,7 @@ function getInitialDemoData(): StoreSchema {
       memberRole: "elder",
       action: "DOSE_TAKEN",
       details: "Took Metformin 500mg with breakfast",
-      timestamp: `${today}T08:35:00.000Z`,
+      timestamp: at(today, "08:35"),
       affectsElder: true,
     },
   };
@@ -374,7 +404,7 @@ export async function getCircle(circleId: string): Promise<Circle | null> {
   const db = initFirestore();
   if (db) {
     try {
-      const doc = await db.collection("circles").doc(circleId).get();
+      const doc = await withTimeout(db.collection("circles").doc(circleId).get(), "read");
       if (doc.exists) return doc.data() as Circle;
     } catch (err) {
       console.warn("[CareCircle DB] Firestore getCircle failed, falling back to in-memory:", err);
@@ -391,7 +421,7 @@ export async function saveCircle(circle: Circle): Promise<void> {
   const db = initFirestore();
   if (db) {
     try {
-      await db.collection("circles").doc(circle.id).set(circle);
+      await withTimeout(db.collection("circles").doc(circle.id).set(circle), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore saveCircle failed, saved in-memory:", err);
     }
@@ -403,7 +433,7 @@ export async function getMembersByCircle(circleId: string): Promise<Member[]> {
   const db = initFirestore();
   if (db) {
     try {
-      const snap = await db.collection("members").where("circleId", "==", circleId).get();
+      const snap = await withTimeout(db.collection("members").where("circleId", "==", circleId).get(), "query");
       if (!snap.empty) {
         return snap.docs.map((d) => d.data() as Member);
       }
@@ -427,7 +457,7 @@ export async function saveMember(member: Member): Promise<void> {
   const db = initFirestore();
   if (db) {
     try {
-      await db.collection("members").doc(member.id).set(member);
+      await withTimeout(db.collection("members").doc(member.id).set(member), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore saveMember failed, saved in-memory:", err);
     }
@@ -439,7 +469,7 @@ export async function getMedications(circleId: string): Promise<Medication[]> {
   const db = initFirestore();
   if (db) {
     try {
-      const snap = await db.collection("medications").where("circleId", "==", circleId).get();
+      const snap = await withTimeout(db.collection("medications").where("circleId", "==", circleId).get(), "query");
       if (!snap.empty) {
         return snap.docs.map((d) => d.data() as Medication);
       }
@@ -455,7 +485,7 @@ export async function getMedicationById(id: string): Promise<Medication | null> 
   const db = initFirestore();
   if (db) {
     try {
-      const doc = await db.collection("medications").doc(id).get();
+      const doc = await withTimeout(db.collection("medications").doc(id).get(), "read");
       if (doc.exists) return doc.data() as Medication;
     } catch (err) {
       console.warn("[CareCircle DB] Firestore getMedicationById failed, falling back to in-memory:", err);
@@ -472,7 +502,7 @@ export async function saveMedication(med: Medication): Promise<void> {
   const db = initFirestore();
   if (db) {
     try {
-      await db.collection("medications").doc(med.id).set(med);
+      await withTimeout(db.collection("medications").doc(med.id).set(med), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore saveMedication failed, saved in-memory:", err);
     }
@@ -486,7 +516,7 @@ export async function deleteMedication(id: string): Promise<void> {
   const db = initFirestore();
   if (db) {
     try {
-      await db.collection("medications").doc(id).delete();
+      await withTimeout(db.collection("medications").doc(id).delete(), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore deleteMedication failed, deleted in-memory:", err);
     }
@@ -502,7 +532,7 @@ export async function getDoseEvents(circleId: string, dateStr?: string): Promise
       if (dateStr) {
         q = q.where("scheduledDate", "==", dateStr);
       }
-      const snap = await q.get();
+      const snap = await withTimeout(q.get(), "getDoseEvents");
       if (!snap.empty) {
         return snap.docs.map((d) => d.data() as DoseEvent);
       }
@@ -520,7 +550,7 @@ export async function getAllDoseEvents(circleId: string): Promise<DoseEvent[]> {
   const db = initFirestore();
   if (db) {
     try {
-      const snap = await db.collection("dose_events").where("circleId", "==", circleId).get();
+      const snap = await withTimeout(db.collection("dose_events").where("circleId", "==", circleId).get(), "query");
       if (!snap.empty) {
         return snap.docs.map((d) => d.data() as DoseEvent);
       }
@@ -539,7 +569,7 @@ export async function saveDoseEvent(event: DoseEvent): Promise<void> {
   const db = initFirestore();
   if (db) {
     try {
-      await db.collection("dose_events").doc(event.id).set(event);
+      await withTimeout(db.collection("dose_events").doc(event.id).set(event), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore saveDoseEvent failed, saved in-memory:", err);
     }
@@ -560,8 +590,8 @@ export async function updateDoseEvent(id: string, updates: Partial<DoseEvent>): 
   if (db) {
     try {
       const ref = db.collection("dose_events").doc(id);
-      await ref.update({ ...updates, updatedAt: new Date().toISOString() });
-      const updated = await ref.get();
+      await withTimeout(ref.update({ ...updates, updatedAt: new Date().toISOString() }), "update");
+      const updated = await withTimeout(ref.get(), "read");
       if (updated.exists) return updated.data() as DoseEvent;
     } catch (err) {
       console.warn("[CareCircle DB] Firestore updateDoseEvent failed, updated in-memory:", err);
@@ -576,7 +606,7 @@ export async function getAppointments(circleId: string): Promise<Appointment[]> 
   const db = initFirestore();
   if (db) {
     try {
-      const snap = await db.collection("appointments").where("circleId", "==", circleId).get();
+      const snap = await withTimeout(db.collection("appointments").where("circleId", "==", circleId).get(), "query");
       if (!snap.empty) {
         return snap.docs.map((d) => d.data() as Appointment);
       }
@@ -595,7 +625,7 @@ export async function saveAppointment(apt: Appointment): Promise<void> {
   const db = initFirestore();
   if (db) {
     try {
-      await db.collection("appointments").doc(apt.id).set(apt);
+      await withTimeout(db.collection("appointments").doc(apt.id).set(apt), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore saveAppointment failed, saved in-memory:", err);
     }
@@ -609,7 +639,7 @@ export async function deleteAppointment(id: string): Promise<void> {
   const db = initFirestore();
   if (db) {
     try {
-      await db.collection("appointments").doc(id).delete();
+      await withTimeout(db.collection("appointments").doc(id).delete(), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore deleteAppointment failed, deleted in-memory:", err);
     }
@@ -630,7 +660,7 @@ export async function logActivity(log: Omit<ActivityLog, "id" | "timestamp">): P
   const db = initFirestore();
   if (db) {
     try {
-      await db.collection("activity_logs").doc(fullLog.id).set(fullLog);
+      await withTimeout(db.collection("activity_logs").doc(fullLog.id).set(fullLog), "write");
     } catch (err) {
       console.warn("[CareCircle DB] Firestore logActivity failed, logged in-memory:", err);
     }
@@ -643,14 +673,16 @@ export async function getActivityLogs(circleId: string, limitCount = 50): Promis
   const db = initFirestore();
   if (db) {
     try {
-      const snap = await db
-        .collection("activity_logs")
-        .where("circleId", "==", circleId)
-        .orderBy("timestamp", "desc")
-        .limit(limitCount)
-        .get();
+      // Equality filter only + in-code sorting: no composite index required
+      const snap = await withTimeout(
+        db.collection("activity_logs").where("circleId", "==", circleId).get(),
+        "getActivityLogs"
+      );
       if (!snap.empty) {
-        return snap.docs.map((d) => d.data() as ActivityLog);
+        return snap.docs
+          .map((d) => d.data() as ActivityLog)
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .slice(0, limitCount);
       }
     } catch (err) {
       console.warn("[CareCircle DB] Firestore getActivityLogs failed, falling back to in-memory:", err);
@@ -661,6 +693,65 @@ export async function getActivityLogs(circleId: string, limitCount = 50): Promis
     .filter((a) => a.circleId === circleId)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, limitCount);
+}
+
+// ==========================================
+// 4. Demo Seeding (idempotent)
+// ==========================================
+declare global {
+  // eslint-disable-next-line no-var
+  var __carecircle_demo_seeded_for: string | undefined;
+}
+
+/**
+ * Makes sure the judge demo circle (CC-DEMO) exists in Firestore with live-looking data.
+ * - Seeds everything once if the circle or its medications are missing.
+ * - Seeds today's dose events every new day so the dashboard never looks empty.
+ * Safe to call on every demo login: it only writes what is missing.
+ */
+export async function ensureDemoSeeded(): Promise<{ seeded: boolean; mode: "firestore" | "in_memory" }> {
+  const db = initFirestore();
+  if (!db) return { seeded: false, mode: "in_memory" };
+
+  const today = todayInTz();
+  if (globalThis.__carecircle_demo_seeded_for === today) return { seeded: false, mode: "firestore" };
+
+  try {
+    const demo = getInitialDemoData();
+    const [circleDoc, medsSnap, todaysDoses] = await Promise.all([
+      withTimeout(db.collection("circles").doc("CC-DEMO").get(), "seed-check"),
+      withTimeout(db.collection("medications").where("circleId", "==", "CC-DEMO").get(), "seed-check"),
+      withTimeout(
+        db.collection("dose_events").where("circleId", "==", "CC-DEMO").where("scheduledDate", "==", today).get(),
+        "seed-check"
+      ),
+    ]);
+
+    const batch = db.batch();
+    let writes = 0;
+    const put = (collection: string, id: string, data: object) => {
+      batch.set(db.collection(collection).doc(id), data);
+      writes++;
+    };
+
+    if (!circleDoc.exists || medsSnap.empty) {
+      Object.values(demo.circles).forEach((c) => put("circles", c.id, c));
+      Object.values(demo.members).forEach((m) => put("members", m.id, m));
+      Object.values(demo.medications).forEach((m) => put("medications", m.id, m));
+      Object.values(demo.appointments).forEach((a) => put("appointments", a.id, a));
+      Object.values(demo.activityLogs).forEach((a) => put("activity_logs", a.id, a));
+    }
+    if (todaysDoses.empty) {
+      Object.values(demo.doseEvents).forEach((d) => put("dose_events", d.id, d));
+    }
+
+    if (writes > 0) await withTimeout(batch.commit(), "seed-commit");
+    globalThis.__carecircle_demo_seeded_for = today;
+    return { seeded: writes > 0, mode: "firestore" };
+  } catch (err) {
+    console.warn("[CareCircle DB] Demo seeding failed, demo will use in-memory data:", err);
+    return { seeded: false, mode: "firestore" };
+  }
 }
 
 // Helper to check DB status

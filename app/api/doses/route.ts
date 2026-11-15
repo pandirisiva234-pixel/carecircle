@@ -13,6 +13,7 @@ import {
   buildDoseEventsForDay,
   calculateAdherenceMetrics,
 } from "@/lib/adherence";
+import { todayInTz } from "@/lib/timezone";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -21,8 +22,9 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const todayStr = new Date().toISOString().split("T")[0];
-  const dateStr = searchParams.get("date") || todayStr;
+  const todayStr = todayInTz();
+  const requestedDate = searchParams.get("date");
+  const dateStr = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : todayStr;
 
   // 1. Fetch medications and existing events
   const medications = await getMedications(session.circleId);

@@ -5,6 +5,12 @@ import { Medication } from "@/lib/types";
 import { medicationSchema } from "@/lib/validations";
 import { X, Plus, Trash2, Pill } from "lucide-react";
 
+/** Today as YYYY-MM-DD in the user's own (browser) timezone. */
+function localDateStr(d: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 interface MedicationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -24,7 +30,7 @@ export function MedicationModal({
   const [dosage, setDosage] = useState("");
   const [timesPerDay, setTimesPerDay] = useState(1);
   const [scheduleTimes, setScheduleTimes] = useState<string[]>(["08:00"]);
-  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(localDateStr());
   const [endDate, setEndDate] = useState("");
   const [notes, setNotes] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -51,7 +57,7 @@ export function MedicationModal({
       setDosage("");
       setTimesPerDay(1);
       setScheduleTimes(["08:00"]);
-      setStartDate(new Date().toISOString().split("T")[0]);
+      setStartDate(localDateStr());
       setEndDate("");
       setNotes("");
       setInstructions("");

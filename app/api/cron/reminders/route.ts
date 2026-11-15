@@ -20,25 +20,43 @@ import {
   buildEscalatedMissedDoseEmail,
   buildAppointment24hEmail,
 } from "@/lib/email";
+import { todayInTz, parseDateTimeInTz } from "@/lib/timezone";
+import { getSession } from "@/lib/auth";
+import { timingSafeEqual } from "crypto";
+
+function secretsMatch(provided: string | null, expected: string): boolean {
+  if (!provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
     // 1. Validate CRON_SECRET from header
-    const cronSecret = process.env.CRON_SECRET || "carecircle-cron-secret-change-me";
+    const cronSecret = process.env.CRON_SECRET?.trim().replace(/^"|"$/g, "");
+    if (!cronSecret) {
+      return NextResponse.json({ error: "CRON_SECRET is not configured on the server." }, { status: 503 });
+    }
     const authHeader = req.headers.get("authorization");
     const secretHeader = req.headers.get("x-cron-secret");
 
     const providedSecret =
       secretHeader || (authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null);
 
-    if (providedSecret !== cronSecret) {
+    // Authorised callers: the scheduler (secret header) or a signed-in caretaker/family member
+    // using the in-app "Run reminders now" button. The secret is never shipped to the browser.
+    const session = secretsMatch(providedSecret, cronSecret) ? null : await getSession();
+    const isSchedulerCall = secretsMatch(providedSecret, cronSecret);
+    const isTrustedMember = !!session && (session.role === "caretaker" || session.role === "family");
+    if (!isSchedulerCall && !isTrustedMember) {
       return NextResponse.json({ error: "Unauthorized. Invalid CRON_SECRET." }, { status: 401 });
     }
 
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
+    const todayStr = todayInTz(now);
 
     // For demonstration and active circle processing, process circle "CC-DEMO" and any active circles
     const circlesToProcess = ["CC-DEMO"];
@@ -149,7 +167,8 @@ export async function POST(req: NextRequest) {
       for (const apt of appointments) {
         if (apt.reminderSent) continue;
 
-        const aptTime = new Date(apt.dateTime);
+        // Appointment times without an explicit offset are in the circle's local timezone
+        const aptTime = parseDateTimeInTz(apt.dateTime);
         const hoursUntil = (aptTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
         // Within 23 to 25 hours window

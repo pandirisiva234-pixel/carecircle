@@ -1,3 +1,4 @@
+import { todayInTz } from "./timezone";
 import { GoogleGenAI } from "@google/genai";
 import { ExtractedMedication } from "./types";
 
@@ -22,7 +23,7 @@ export async function extractMedicationsFromImage(
         notes: "Take once daily in the morning for hypertension.",
         instructions: "Swallow whole with a glass of water.",
         prescribedBy: "Dr. Evelyn Thorne (Cardiology)",
-        startDate: new Date().toISOString().split("T")[0],
+        startDate: todayInTz(),
       },
       {
         name: "Atorvastatin Calcium",
@@ -32,7 +33,7 @@ export async function extractMedicationsFromImage(
         notes: "Cholesterol management. Take in the evening.",
         instructions: "Take with or without food at bedtime.",
         prescribedBy: "Dr. Evelyn Thorne",
-        startDate: new Date().toISOString().split("T")[0],
+        startDate: todayInTz(),
       },
       {
         name: "Metformin HCl",
@@ -42,7 +43,7 @@ export async function extractMedicationsFromImage(
         notes: "Blood sugar regulation. Take with food.",
         instructions: "Twice daily with breakfast and dinner.",
         prescribedBy: "Dr. Evelyn Thorne",
-        startDate: new Date().toISOString().split("T")[0],
+        startDate: todayInTz(),
       },
     ];
 
@@ -114,7 +115,7 @@ Do NOT wrap the output in markdown code blocks like \`\`\`json. Return strictly 
       notes: item.notes || "",
       instructions: item.instructions || "",
       prescribedBy: item.prescribedBy || "",
-      startDate: new Date().toISOString().split("T")[0],
+      startDate: todayInTz(),
     }));
 
     return {

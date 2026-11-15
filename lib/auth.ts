@@ -4,7 +4,17 @@ import { cookies } from "next/headers";
 import { SessionUser } from "./types";
 
 const COOKIE_NAME = "carecircle_session";
-const SESSION_SECRET = process.env.SESSION_SECRET || "carecircle-fallback-secret-key-32-chars-long";
+const DEV_FALLBACK_SECRET = "carecircle-dev-only-secret-not-for-production";
+
+/** Session signing key. Production refuses to sign sessions with the development fallback. */
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET?.trim().replace(/^"|"$/g, "");
+  if (secret && secret.length >= 32) return secret;
+  if (process.env.NODE_ENV === "production" && process.env.VERCEL) {
+    throw new Error("SESSION_SECRET must be set (32+ characters) in production.");
+  }
+  return DEV_FALLBACK_SECRET;
+}
 const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 // --- Passcode Hashing ---
@@ -32,7 +42,7 @@ export function signToken(user: SessionUser): string {
   const payload: SessionPayload = { user, exp };
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = crypto
-    .createHmac("sha256", SESSION_SECRET)
+    .createHmac("sha256", getSessionSecret())
     .update(encodedPayload)
     .digest("base64url");
   return `${encodedPayload}.${signature}`;
@@ -45,7 +55,7 @@ export function verifyToken(token: string): SessionUser | null {
     const [encodedPayload, signature] = parts;
     
     const expectedSig = crypto
-      .createHmac("sha256", SESSION_SECRET)
+      .createHmac("sha256", getSessionSecret())
       .update(encodedPayload)
       .digest("base64url");
 

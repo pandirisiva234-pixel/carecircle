@@ -18,10 +18,8 @@ export function CronTesterModal({ onTriggered, highContrast }: CronTesterModalPr
     setError(null);
     try {
       const res = await fetch("/api/cron/reminders", {
+        // Authorised by the signed-in caretaker/family session cookie; no secret in the browser
         method: "POST",
-        headers: {
-          "x-cron-secret": "carecircle-cron-secret-change-me",
-        },
       });
 
       const data = await res.json();
