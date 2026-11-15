@@ -187,9 +187,16 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-sky-200">
+    <div className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-sky-200 overflow-x-hidden">
+      {/* Decorative background: soft colour glows + faint dot grid */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-0 overflow-hidden">
+        <div className="absolute -top-32 -left-24 w-[520px] h-[520px] rounded-full bg-sky-300/30 blur-3xl" />
+        <div className="absolute top-40 right-[-120px] w-[460px] h-[460px] rounded-full bg-violet-300/25 blur-3xl" />
+        <div className="absolute bottom-[-160px] left-1/3 w-[520px] h-[420px] rounded-full bg-emerald-200/30 blur-3xl" />
+        <div className="absolute inset-0 [background-image:radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:22px_22px] opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent_70%)]" />
+      </div>
       {/* Top Header */}
-      <header className="border-b border-slate-200 bg-white/95 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3.5 shadow-sm">
+      <header className="border-b border-slate-200 bg-white/85 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3.5 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-500 text-white flex items-center justify-center font-bold shadow-sm">
@@ -216,7 +223,7 @@ export default function LandingPage() {
       </header>
 
       {/* Main Hero & Auth Section */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-8 py-10 sm:py-16 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+      <main className="relative z-10 flex-1 max-w-7xl mx-auto px-4 sm:px-8 py-10 sm:py-16 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         {/* Left Column: Mission, Features & Google Tech */}
         <div className="lg:col-span-7 space-y-8">
           <div className="space-y-4">
@@ -225,16 +232,33 @@ export default function LandingPage() {
               <span>WCAG Accessible • Google Cloud Firestore • Gemini 3.8 Flash AI</span>
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
-              Elder-centered care, <span className="text-sky-600">coordinated as a family.</span>
+              Elder-centered care,{" "}
+              <span className="bg-gradient-to-r from-sky-600 via-cyan-500 to-emerald-500 bg-clip-text text-transparent">
+                coordinated as a family.
+              </span>
             </h1>
             <p className="text-lg text-slate-600 leading-relaxed max-w-2xl">
               CareCircle keeps elders at the center of their healthcare decisions while giving caretakers and family members shared visibility, automated escalation reminders, and Gemini AI prescription scanning.
             </p>
+
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 max-w-2xl">
+              {[
+                { k: "3 roles", v: "Elder · Caretaker · Family" },
+                { k: "1 tap", v: "to mark a dose taken" },
+                { k: "30 min", v: "before family is alerted" },
+                { k: "AI scan", v: "prescription → schedule" },
+              ].map((item) => (
+                <div key={item.k} className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 px-3 py-2.5 shadow-sm">
+                  <dt className="text-lg font-black text-slate-900 leading-tight">{item.k}</dt>
+                  <dd className="text-[11px] font-semibold text-slate-600 leading-snug">{item.v}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
           {/* Key Value Highlights Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-1.5">
+            <div className="p-4 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm space-y-1.5 motion-safe:transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300">
               <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
@@ -244,7 +268,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-1.5">
+            <div className="p-4 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm space-y-1.5 motion-safe:transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300">
               <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                 <Sparkles className="w-5 h-5" />
               </div>
@@ -254,7 +278,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-1.5">
+            <div className="p-4 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm space-y-1.5 motion-safe:transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300">
               <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
                 <Clock className="w-5 h-5" />
               </div>
@@ -264,7 +288,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-1.5">
+            <div className="p-4 rounded-2xl bg-white/90 backdrop-blur border border-slate-200 shadow-sm space-y-1.5 motion-safe:transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-sky-300">
               <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
                 <Calendar className="w-5 h-5" />
               </div>
@@ -275,20 +299,34 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Architecture Badge */}
-          <div className="p-4 rounded-2xl bg-slate-100 border border-slate-200 text-xs text-slate-600 space-y-1">
-            <span className="font-bold uppercase tracking-wider text-slate-500 block">
-              Production Architecture & Services
-            </span>
-            <p>
-              Built with Next.js 15 (App Router, Vercel & Docker Standalone), Google Cloud Firestore (via firebase-admin), Gemini 3.8 Flash API (@google/genai), and automated 15-min GitHub Actions cron.
-            </p>
-          </div>
+          {/* How it works */}
+          <section aria-labelledby="how-heading" className="rounded-3xl bg-white/80 backdrop-blur border border-slate-200 p-5 shadow-sm">
+            <h2 id="how-heading" className="text-xs font-bold uppercase tracking-wider text-sky-700">
+              How it works
+            </h2>
+            <ol className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { n: "1", t: "Create a circle", d: "Set up the elder's profile and invite family with a Circle ID and personal passcode." },
+                { n: "2", t: "Add or scan medicines", d: "Type them in, or snap the prescription and let Gemini fill the schedule for review." },
+                { n: "3", t: "Stay in the loop", d: "The elder taps Taken. If a dose is missed, the elder is reminded first, then family." },
+              ].map((step) => (
+                <li key={step.n} className="flex gap-3">
+                  <span className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-sky-600 to-emerald-500 text-white font-black flex items-center justify-center shadow-sm">
+                    {step.n}
+                  </span>
+                  <div>
+                    <p className="font-extrabold text-slate-900 text-sm">{step.t}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed mt-0.5">{step.d}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
         </div>
 
         {/* Right Column: Interactive Login & Demo Card */}
         <div className="lg:col-span-5 w-full">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl space-y-6">
+          <div className="lg:sticky lg:top-24 bg-white/95 backdrop-blur rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-[0_20px_60px_-15px_rgba(2,132,199,0.35)] ring-1 ring-sky-100 space-y-6">
             {/* Tab Switcher */}
             <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
               <button
@@ -737,11 +775,11 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500 font-medium">
+      <footer className="relative z-10 border-t border-slate-200 bg-white/90 backdrop-blur py-6 text-center text-xs text-slate-600 font-medium">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>© 2026 CareCircle. Dedicated to respectful, accessible, and connected elder care.</p>
           <div className="flex items-center space-x-4">
-            <span>Google Cloud Run</span>
+            <span>Vercel (Cloud Run-ready)</span>
             <span>•</span>
             <span>Firestore</span>
             <span>•</span>

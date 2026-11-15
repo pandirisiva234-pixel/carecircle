@@ -304,6 +304,43 @@ function getInitialDemoData(): StoreSchema {
     },
   };
 
+  // Six days of realistic history so the 7-day adherence trend is meaningful in the demo
+  const slots: Array<[string, string, string, string]> = [
+    ["med-1", "Amlodipine", "5mg (1 tablet)", "08:00"],
+    ["med-2", "Metformin", "500mg (1 tablet)", "08:30"],
+    ["med-3", "Glucosamine & Chondroitin", "1500mg", "13:00"],
+    ["med-2", "Metformin", "500mg (1 tablet)", "20:00"],
+    ["med-4", "Atorvastatin", "20mg (1 tablet)", "21:00"],
+  ];
+  const missedByDaysAgo: Record<number, number[]> = { 6: [], 5: [2], 4: [], 3: [4], 2: [2, 3], 1: [] };
+  for (let daysAgo = 6; daysAgo >= 1; daysAgo--) {
+    const date = addDays(today, -daysAgo);
+    slots.forEach(([medId, medName, dosage, time], i) => {
+      const missed = missedByDaysAgo[daysAgo].includes(i);
+      const id = `dose-${medId}-${date}-${time.replace(":", "")}`;
+      doseEvents[id] = {
+        id,
+        circleId: "CC-DEMO",
+        medicationId: medId,
+        medicationName: medName,
+        dosage,
+        scheduledTime: at(date, time),
+        scheduledTimeLocal: time,
+        scheduledDate: date,
+        status: missed ? "missed" : "taken",
+        ...(missed
+          ? { missedReminderElderSent: true, missedReminderEscalatedSent: true }
+          : {
+              takenAt: at(date, time.replace(/:\d\d$/, ":10")),
+              takenByMemberId: "mem-elder",
+              takenByMemberName: "Margaret Jenkins",
+            }),
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+  }
+
   const tomorrowDateStr = addDays(today, 1);
   const nextWeekDateStr = addDays(today, 7);
 
@@ -728,10 +765,7 @@ export async function ensureDemoSeeded(): Promise<{ seeded: boolean; mode: "fire
     const [circleDoc, medsSnap, todaysDoses] = await Promise.all([
       withTimeout(db.collection("circles").doc("CC-DEMO").get(), "seed-check"),
       withTimeout(db.collection("medications").where("circleId", "==", "CC-DEMO").get(), "seed-check"),
-      withTimeout(
-        db.collection("dose_events").where("circleId", "==", "CC-DEMO").where("scheduledDate", "==", today).get(),
-        "seed-check"
-      ),
+      withTimeout(db.collection("dose_events").where("circleId", "==", "CC-DEMO").get(), "seed-check"),
     ]);
 
     const batch = db.batch();
@@ -748,9 +782,11 @@ export async function ensureDemoSeeded(): Promise<{ seeded: boolean; mode: "fire
       Object.values(demo.appointments).forEach((a) => put("appointments", a.id, a));
       Object.values(demo.activityLogs).forEach((a) => put("activity_logs", a.id, a));
     }
-    if (todaysDoses.empty) {
-      Object.values(demo.doseEvents).forEach((d) => put("dose_events", d.id, d));
-    }
+    // Fill in any missing demo doses (today + 6-day history) without touching ones users already changed
+    const existingDoseIds = new Set(todaysDoses.docs.map((doc) => doc.id));
+    Object.values(demo.doseEvents)
+      .filter((d) => !existingDoseIds.has(d.id))
+      .forEach((d) => put("dose_events", d.id, d));
 
     if (writes > 0) await withTimeout(batch.commit(), "seed-commit");
     globalThis.__carecircle_demo_seeded_for = today;

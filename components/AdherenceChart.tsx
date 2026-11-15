@@ -97,7 +97,8 @@ export function AdherenceChart({ metrics, highContrast }: AdherenceChartProps) {
         </h4>
         <div className="h-44 flex items-end justify-between gap-2 sm:gap-4 pt-4 px-2 bg-slate-50/70 border border-slate-200 rounded-xl">
           {weeklyTrend.map((day, idx) => {
-            const heightPercent = Math.max(day.rate, 12);
+            const hasData = day.taken + day.missed > 0;
+            const heightPercent = hasData ? Math.max(day.rate, 12) : 6;
             const isToday = idx === weeklyTrend.length - 1;
 
             return (
@@ -107,12 +108,12 @@ export function AdherenceChart({ metrics, highContrast }: AdherenceChartProps) {
               >
                 {/* Tooltip on hover */}
                 <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity absolute -top-10 bg-slate-900 text-white text-[11px] font-semibold py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10 shadow-lg">
-                  {day.date}: {day.taken}/{day.taken + day.missed} taken ({day.rate}%)
+                  {hasData ? `${day.date}: ${day.taken}/${day.taken + day.missed} taken (${day.rate}%)` : `${day.date}: no doses recorded yet`}
                 </div>
 
                 {/* Percentage label above bar */}
                 <span className="text-[10px] font-bold text-slate-500 mb-1">
-                  {day.rate}%
+                  {hasData ? `${day.rate}%` : "—"}
                 </span>
 
                 {/* Bar */}
@@ -120,7 +121,9 @@ export function AdherenceChart({ metrics, highContrast }: AdherenceChartProps) {
                   className="w-full max-w-[42px] rounded-t-lg transition-all"
                   style={{
                     height: `${heightPercent}%`,
-                    backgroundColor: highContrast
+                    backgroundColor: !hasData
+                      ? "#cbd5e1"
+                      : highContrast
                       ? isToday
                         ? "#000000"
                         : "#475569"
@@ -131,7 +134,7 @@ export function AdherenceChart({ metrics, highContrast }: AdherenceChartProps) {
                       : "#dc2626",
                   }}
                   tabIndex={0}
-                  aria-label={`${day.dayLabel} ${day.date}: ${day.rate}% adherence`}
+                  aria-label={hasData ? `${day.dayLabel} ${day.date}: ${day.rate}% adherence` : `${day.dayLabel} ${day.date}: no doses recorded`}
                 />
 
                 {/* Day Label */}
