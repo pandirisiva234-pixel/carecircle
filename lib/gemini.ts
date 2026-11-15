@@ -11,8 +11,6 @@ export const GEMINI_MODELS: string[] = Array.from(
       process.env.GEMINI_MODEL,
       "gemini-3.8-flash",
       "gemini-3.8-flash-lite",
-      "gemini-flash-latest",
-      "gemini-flash-lite-latest",
     ].filter((m): m is string => !!m)
   )
 );
@@ -37,7 +35,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * - busy / rate-limited (503)  → retry with backoff, then try the next model
  * Total worst-case wait stays well inside a serverless request timeout.
  */
-const ATTEMPT_TIMEOUT_MS = 15000; // one Gemini call
+const ATTEMPT_TIMEOUT_MS = 40000; // one Gemini call (unavailable model names fail fast with 404)
 const TOTAL_BUDGET_MS = 50000; // stays inside the 60s serverless limit
 
 function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {

@@ -1,14 +1,32 @@
 import nodemailer from "nodemailer";
 
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+const clean = (v?: string) => v?.trim().replace(/^"|"$/g, "");
+const GMAIL_USER = clean(process.env.GMAIL_USER);
+// Gmail shows app passwords in groups of 4 ("abcd efgh ijkl mnop"); spaces are not part of the password
+const GMAIL_APP_PASSWORD = clean(process.env.GMAIL_APP_PASSWORD)?.replace(/\s+/g, "");
+
+/** True only when real Gmail credentials are configured (not empty or a placeholder). */
+export function isEmailConfigured(): boolean {
+  return (
+    !!GMAIL_USER &&
+    !!GMAIL_APP_PASSWORD &&
+    GMAIL_APP_PASSWORD.length === 16 &&
+    !/PASTE|your-|change-me/i.test(GMAIL_APP_PASSWORD) &&
+    GMAIL_USER !== "carecircle.alerts@gmail.com"
+  );
+}
+
+/** Demo accounts use reserved example addresses; never try to deliver real mail to them. */
+export function isDemoAddress(email: string): boolean {
+  return /\.demo@carecircle\.app$/i.test(email);
+}
 
 let transporter: nodemailer.Transporter | null = null;
 
 function getTransporter(): nodemailer.Transporter | null {
   if (transporter) return transporter;
 
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD || GMAIL_USER === "carecircle.alerts@gmail.com") {
+  if (!isEmailConfigured()) {
     return null;
   }
 
@@ -31,7 +49,7 @@ export interface SendEmailOptions {
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<{ success: boolean; simulated?: boolean; messageId?: string; error?: string }> {
-  const mailer = getTransporter();
+  const mailer = isDemoAddress(options.to) ? null : getTransporter();
 
   if (!mailer) {
     console.log(`[CareCircle Email Simulated] To: ${options.to} | Subject: "${options.subject}"`);
@@ -44,13 +62,17 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
   }
 
   try {
-    const info = await mailer.sendMail({
+    // Never let a slow SMTP server hold up the user's request
+    const info = await Promise.race([
+      mailer.sendMail({
       from: `"CareCircle Alerts" <${GMAIL_USER}>`,
       to: options.to,
       subject: options.subject,
       text: options.text,
       html: options.html,
-    });
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("SMTP timeout after 8s")), 8000)),
+    ]);
 
     console.log(`[CareCircle Email Sent] ID: ${info.messageId} to ${options.to}`);
     return {

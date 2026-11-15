@@ -142,7 +142,9 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
     setError(null);
 
     try {
-      // Save each medication via /api/medications
+      // Save each medication via /api/medications (duplicates already in the plan are skipped)
+      let added = 0;
+      const skipped: string[] = [];
       for (const med of extractedMeds) {
         const payload = {
           name: med.name,
@@ -162,13 +164,22 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
           body: JSON.stringify(payload),
         });
 
+        if (res.status === 409) {
+          skipped.push(med.name);
+          continue;
+        }
         if (!res.ok) {
-          const errData = await res.json();
+          const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || `Failed saving ${med.name}`);
         }
+        added++;
       }
 
-      setSuccessMsg(`Successfully added ${extractedMeds.length} prescription medications to the circle!`);
+      setSuccessMsg(
+        `Added ${added} ${added === 1 ? "medicine" : "medicines"} to the plan` +
+          (skipped.length ? ` · skipped ${skipped.join(", ")} (already in the plan)` : "") +
+          "."
+      );
       setShowReview(false);
       setImagePreview(null);
       setSelectedFile(null);

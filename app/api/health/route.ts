@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbStatus } from "@/lib/db";
 import { DEFAULT_TIMEZONE, todayInTz } from "@/lib/timezone";
+import { isEmailConfigured } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export async function GET() {
     timezone: DEFAULT_TIMEZONE,
     today: todayInTz(),
     gemini: Boolean(process.env.GEMINI_API_KEY),
-    email: Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD && !process.env.GMAIL_APP_PASSWORD.includes("PASTE")),
+    email: isEmailConfigured() ? "gmail" : "simulated",
     timestamp: new Date().toISOString(),
   });
 }

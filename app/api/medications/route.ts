@@ -33,6 +33,20 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
+
+    // Prevent accidental double entries (e.g. scanning the same prescription twice)
+    const existingMeds = await getMedications(session.circleId);
+    const norm = (v: string) => v.toLowerCase().replace(/\s+/g, "");
+    const duplicate = existingMeds.find(
+      (m) => m.active && norm(m.name) === norm(data.name) && norm(m.dosage) === norm(data.dosage)
+    );
+    if (duplicate) {
+      return NextResponse.json(
+        { error: `${data.name} ${data.dosage} is already in the medication plan`, duplicateOf: duplicate.id },
+        { status: 409 }
+      );
+    }
+
     const now = new Date().toISOString();
     const medId = `med-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 

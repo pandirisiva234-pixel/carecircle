@@ -112,7 +112,7 @@ Next.js 15 (App Router, TypeScript) · React 19 · Tailwind CSS · Google Cloud 
 npm test
 ```
 
-**42 unit tests** across 5 suites (Vitest):
+**44 unit tests** across 6 suites (Vitest):
 
 | Suite | Covers |
 |---|---|
@@ -120,6 +120,7 @@ npm test
 | `timezone.test.ts` | IST vs UTC day boundaries, 8:00 IST → 02:30 UTC, DST zones, month/year rollovers, deterministic dose IDs |
 | `auth.test.ts` | Session signing, **tamper and role-escalation rejection**, expiry, bcrypt hashing, rate limiting |
 | `validations.test.ts` | Invalid times and dates, limits, unknown roles, email requirements, dose statuses |
+| `email.test.ts` | Demo addresses never receive real mail; sending never throws |
 | `gemini.test.ts` | Current model with automatic fallback, no raw API errors shown to users |
 
 ## 📈 Scalability
@@ -128,6 +129,7 @@ npm test
 - Firestore queries use **equality filters only** (sorting in code), so they need no composite indexes and scale with the data.
 - **Deterministic dose IDs** (`dose-{med}-{date}-{time}`) make reconciliation idempotent: repeated or parallel requests never create duplicate doses.
 - Seeding and reminders are idempotent and safe to retry.
+- Emails time out after 8 s and never block a request; unconfigured Gmail falls back to logged "simulated" delivery.
 - Next steps: Firestore batched reads for many circles, Cloud Tasks / Pub/Sub for fan-out reminders, FCM push notifications, SMS/WhatsApp for elders without email.
 
 ---
