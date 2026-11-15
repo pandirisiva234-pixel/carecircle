@@ -187,7 +187,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-sky-200 overflow-x-hidden">
+    <div className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-sky-200 overflow-x-clip">
       {/* Decorative background: soft colour glows + faint dot grid */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-0 overflow-hidden">
         <div className="absolute -top-32 -left-24 w-[520px] h-[520px] rounded-full bg-sky-300/30 blur-3xl" />
