@@ -16,15 +16,38 @@ function isModelUnavailable(err: unknown): boolean {
   return /NOT_FOUND|404|no longer available|not found for API version|is not supported/i.test(msg);
 }
 
+function isTransientOverload(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /503|UNAVAILABLE|high demand|overloaded|429|RESOURCE_EXHAUSTED|ECONNRESET|ETIMEDOUT/i.test(msg);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Calls Gemini resiliently:
+ * - retired model (404)        → move on to the next model
+ * - busy / rate-limited (503)  → retry with backoff, then try the next model
+ * Total worst-case wait stays well inside a serverless request timeout.
+ */
 async function generateWithModelFallback(ai: GoogleGenAI, params: GenerateParams) {
   let lastError: unknown;
   for (const model of GEMINI_MODELS) {
-    try {
-      return await ai.models.generateContent({ ...params, model });
-    } catch (err) {
-      lastError = err;
-      if (!isModelUnavailable(err)) throw err;
-      console.warn(`[Gemini API] Model ${model} unavailable, trying next model.`);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await ai.models.generateContent({ ...params, model });
+      } catch (err) {
+        lastError = err;
+        if (isModelUnavailable(err) && !isTransientOverload(err)) {
+          console.warn(`[Gemini API] Model ${model} unavailable, trying next model.`);
+          break;
+        }
+        if (isTransientOverload(err)) {
+          console.warn(`[Gemini API] Model ${model} busy (attempt ${attempt + 1}), retrying.`);
+          await sleep(800 * (attempt + 1));
+          continue;
+        }
+        throw err;
+      }
     }
   }
   throw lastError;
@@ -35,7 +58,7 @@ export function friendlyGeminiError(raw: string): string {
   if (/API key|API_KEY|PERMISSION_DENIED|401|403/i.test(raw)) {
     return "The AI service rejected the API key. Please check GEMINI_API_KEY on the server.";
   }
-  if (/quota|RESOURCE_EXHAUSTED|429/i.test(raw)) {
+  if (/quota|RESOURCE_EXHAUSTED|429|503|UNAVAILABLE|high demand|overloaded/i.test(raw)) {
     return "The AI service is busy right now (rate limit). Please try again in a minute.";
   }
   if (/NOT_FOUND|404|no longer available/i.test(raw)) {

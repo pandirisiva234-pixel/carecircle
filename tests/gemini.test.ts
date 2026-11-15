@@ -19,5 +19,8 @@ describe("Gemini integration safeguards", () => {
     expect(friendlyGeminiError("API key not valid")).toMatch(/API key/);
     expect(friendlyGeminiError("RESOURCE_EXHAUSTED: quota exceeded")).toMatch(/try again/i);
     expect(friendlyGeminiError("Unexpected token < in JSON")).toMatch(/photo/i);
+    expect(
+      friendlyGeminiError('{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}')
+    ).toMatch(/busy/i);
   });
 });
