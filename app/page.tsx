@@ -222,7 +222,7 @@ export default function LandingPage() {
           <div className="space-y-4">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
               <Shield className="w-3.5 h-3.5" />
-              <span>WCAG Accessible • Google Cloud Firestore • Gemini 2.5 Flash AI</span>
+              <span>WCAG Accessible • Google Cloud Firestore • Gemini 3.8 Flash AI</span>
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
               Elder-centered care, <span className="text-sky-600">coordinated as a family.</span>
@@ -248,7 +248,7 @@ export default function LandingPage() {
               <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                 <Sparkles className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 text-base">Gemini 2.5 Flash Vision</h3>
+              <h3 className="font-bold text-slate-900 text-base">Gemini 3.8 Flash Vision</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Snap a photo of any prescription label to extract medicine names, dosages, and timings as structured JSON.
               </p>
@@ -281,7 +281,7 @@ export default function LandingPage() {
               Production Architecture & Services
             </span>
             <p>
-              Built with Next.js 15 (App Router, Vercel & Docker Standalone), Google Cloud Firestore (via firebase-admin), Gemini 2.5 Flash API (@google/genai), and automated 15-min GitHub Actions cron.
+              Built with Next.js 15 (App Router, Vercel & Docker Standalone), Google Cloud Firestore (via firebase-admin), Gemini 3.8 Flash API (@google/genai), and automated 15-min GitHub Actions cron.
             </p>
           </div>
         </div>
@@ -745,7 +745,7 @@ export default function LandingPage() {
             <span>•</span>
             <span>Firestore</span>
             <span>•</span>
-            <span>Gemini 2.5 Flash</span>
+            <span>Gemini 3.8 Flash</span>
             <span>•</span>
             <span>WCAG Accessible</span>
           </div>

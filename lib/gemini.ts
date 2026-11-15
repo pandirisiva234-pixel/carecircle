@@ -1,5 +1,51 @@
 import { todayInTz } from "./timezone";
 import { GoogleGenAI } from "@google/genai";
+
+/**
+ * Model preference order. Google retires model versions over time, so the model is configurable
+ * (GEMINI_MODEL) and we automatically fall back to the next model if one is no longer available.
+ */
+export const GEMINI_MODELS: string[] = Array.from(
+  new Set([process.env.GEMINI_MODEL, "gemini-3.8-flash", "gemini-flash-latest"].filter((m): m is string => !!m))
+);
+
+type GenerateParams = Omit<Parameters<GoogleGenAI["models"]["generateContent"]>[0], "model">;
+
+function isModelUnavailable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /NOT_FOUND|404|no longer available|not found for API version|is not supported/i.test(msg);
+}
+
+async function generateWithModelFallback(ai: GoogleGenAI, params: GenerateParams) {
+  let lastError: unknown;
+  for (const model of GEMINI_MODELS) {
+    try {
+      return await ai.models.generateContent({ ...params, model });
+    } catch (err) {
+      lastError = err;
+      if (!isModelUnavailable(err)) throw err;
+      console.warn(`[Gemini API] Model ${model} unavailable, trying next model.`);
+    }
+  }
+  throw lastError;
+}
+
+/** Turns raw API errors into a message a caretaker can act on (no raw JSON in the UI). */
+export function friendlyGeminiError(raw: string): string {
+  if (/API key|API_KEY|PERMISSION_DENIED|401|403/i.test(raw)) {
+    return "The AI service rejected the API key. Please check GEMINI_API_KEY on the server.";
+  }
+  if (/quota|RESOURCE_EXHAUSTED|429/i.test(raw)) {
+    return "The AI service is busy right now (rate limit). Please try again in a minute.";
+  }
+  if (/NOT_FOUND|404|no longer available/i.test(raw)) {
+    return "The configured Gemini model is unavailable. Set GEMINI_MODEL to a current model.";
+  }
+  if (/JSON|Unexpected token/i.test(raw)) {
+    return "The prescription could not be read clearly. Try a sharper, well-lit photo.";
+  }
+  return "Could not scan this prescription. Please try again or add the medicines manually.";
+}
 import { ExtractedMedication } from "./types";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -74,10 +120,14 @@ Return ONLY a valid JSON array of objects with the exact schema:
   }
 ]
 
+Indian prescriptions often use the "morning - afternoon - night" notation: "1-0-1" means one dose in the morning
+and one at night; "1-0-0" morning only; "0-0-1" night only; "1-1-1" three times a day.
+Map them to times: morning 08:00 (07:30 if "before breakfast" / "empty stomach"), afternoon 14:00, night 21:00
+(22:00 if "at bedtime"). Keep the course length (e.g. "x 30 days") in notes.
+
 Do NOT wrap the output in markdown code blocks like \`\`\`json. Return strictly raw valid JSON.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+    const response = await generateWithModelFallback(ai, {
       contents: [
         {
           role: "user",
@@ -92,6 +142,7 @@ Do NOT wrap the output in markdown code blocks like \`\`\`json. Return strictly 
           ],
         },
       ],
+      config: { responseMimeType: "application/json", temperature: 0.1 },
     });
 
     const text = response.text || "";
@@ -129,7 +180,7 @@ Do NOT wrap the output in markdown code blocks like \`\`\`json. Return strictly 
     return {
       success: false,
       data: [],
-      error: errorMsg,
+      error: friendlyGeminiError(errorMsg),
     };
   }
 }

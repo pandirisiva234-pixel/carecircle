@@ -38,7 +38,7 @@ A **Care Circle** per elder, joined with a **Circle ID + personal passcode**. Th
 |---|---|---|
 | 👵 **Elder-first design** | Large text, one-tap "Taken", high contrast, **voice read-aloud** of today's medicines | The person taking the medicine can use the app without help |
 | 🔔 **"You're in control" notices** | When anyone changes the elder's schedule, the elder sees *who* changed *what* | The elder stays at the centre of their own care decisions |
-| 📸 **Gemini prescription scan** | Photo of a prescription → **Gemini 2.5 Flash** extracts medicines, doses and times as JSON → a human reviews before saving | Removes manual typing errors; AI suggests, a person confirms |
+| 📸 **Gemini prescription scan** | Photo of a prescription → **Gemini 3.8 Flash** extracts medicines, doses and times as JSON → a human reviews before saving | Removes manual typing errors; AI suggests, a person confirms |
 | 🚨 **Two-step escalation** | A dose 0–30 min late reminds the **elder** first; still missed after 30 min, it alerts **caretaker and family** by email | Gentle for the elder, and family only gets alerted when it matters |
 | 📊 **Adherence tracking** | Today's progress ring, adherence %, 7-day trend | Spot problems early |
 | 📅 **Appointments** | Doctor visits with an email reminder 24 hours before | Visits aren't forgotten |
@@ -51,7 +51,7 @@ A **Care Circle** per elder, joined with a **Circle ID + personal passcode**. Th
 
 | Service | Used for |
 |---|---|
-| **Gemini 2.5 Flash** (`@google/genai`) | Multimodal prescription image → structured medication JSON |
+| **Gemini 3.8 Flash** (`@google/genai`) | Multimodal prescription image → structured medication JSON (understands Indian `1-0-1` dosing notation; model is configurable with automatic fallback) |
 | **Google Cloud Firestore** (`firebase-admin`) | All circles, members, medications, dose events, appointments and audit logs |
 | **Firebase** (project + service account) | Secure server-side database access (production-mode rules: no direct client access) |
 | **Gmail SMTP** (Nodemailer) | Dose, missed-dose escalation and appointment reminder emails |
@@ -68,7 +68,7 @@ flowchart LR
   Users -->|HTTPS| UI[Next.js 15 App Router UI<br/>Tailwind · WCAG]
   UI --> API[Next.js API routes<br/>zod validation · signed httpOnly session]
   API --> DB[(Google Cloud Firestore)]
-  API --> GEM[Gemini 2.5 Flash<br/>prescription vision]
+  API --> GEM[Gemini 3.8 Flash<br/>prescription vision]
   API --> MAIL[Gmail SMTP<br/>reminder emails]
   GH[GitHub Actions<br/>every 15 min] -->|x-cron-secret| CRON[/api/cron/reminders/]
   CRON --> DB
@@ -81,7 +81,7 @@ flowchart LR
 
 ## 🧰 Tech stack
 
-Next.js 15 (App Router, TypeScript) · React 19 · Tailwind CSS · Google Cloud Firestore · Gemini 2.5 Flash · Nodemailer · zod · bcryptjs · Vitest · GitHub Actions
+Next.js 15 (App Router, TypeScript) · React 19 · Tailwind CSS · Google Cloud Firestore · Gemini 3.8 Flash · Nodemailer · zod · bcryptjs · Vitest · GitHub Actions
 
 ---
 
@@ -112,7 +112,7 @@ Next.js 15 (App Router, TypeScript) · React 19 · Tailwind CSS · Google Cloud 
 npm test
 ```
 
-**38 unit tests** across 4 suites (Vitest):
+**41 unit tests** across 5 suites (Vitest):
 
 | Suite | Covers |
 |---|---|
@@ -120,6 +120,7 @@ npm test
 | `timezone.test.ts` | IST vs UTC day boundaries, 8:00 IST → 02:30 UTC, DST zones, month/year rollovers, deterministic dose IDs |
 | `auth.test.ts` | Session signing, **tamper and role-escalation rejection**, expiry, bcrypt hashing, rate limiting |
 | `validations.test.ts` | Invalid times and dates, limits, unknown roles, email requirements, dose statuses |
+| `gemini.test.ts` | Current model with automatic fallback, no raw API errors shown to users |
 
 ## 📈 Scalability
 

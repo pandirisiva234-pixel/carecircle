@@ -196,7 +196,7 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
         {/* Elder Centrality Notification Banner */}
-        {recentElderAlerts.length > 0 && (
+        {user.role === "elder" && recentElderAlerts.length > 0 && (
           <aside
             aria-label="Recent care updates"
             className={`p-4 sm:p-5 rounded-2xl border transition-all ${
@@ -631,7 +631,7 @@ export default function DashboardPage() {
       <footer className="border-t border-slate-200 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-semibold text-slate-600">
           <p>CareCircle · keeping elders at the centre of their own care</p>
-          <p>Powered by Google Gemini 2.5 Flash · Google Cloud Firestore · Gmail reminders</p>
+          <p>Powered by Google Gemini 3.8 Flash · Google Cloud Firestore · Gmail reminders</p>
         </div>
       </footer>
 

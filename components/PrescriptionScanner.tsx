@@ -158,7 +158,7 @@ export function PrescriptionScanner({ onMedicationsAdded, highContrast }: Prescr
         <div>
           <div className="flex items-center space-x-2 text-indigo-600 font-bold text-xs uppercase tracking-wider">
             <Sparkles className="w-4 h-4" />
-            <span>Google Gemini 2.5 Flash AI</span>
+            <span>Google Gemini 3.8 Flash AI</span>
           </div>
           <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
             Prescription Vision Scanner
