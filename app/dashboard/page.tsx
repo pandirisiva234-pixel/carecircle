@@ -13,6 +13,7 @@ import { MedicationModal } from "@/components/MedicationModal";
 import { AppointmentModal } from "@/components/AppointmentModal";
 import { ActivityLogView } from "@/components/ActivityLogView";
 import { CronTesterModal } from "@/components/CronTesterModal";
+import { TodayProgress } from "@/components/TodayProgress";
 import { formatTime12h, formatDatePretty } from "@/lib/utils";
 import {
   Calendar,
@@ -230,6 +231,17 @@ export default function DashboardPage() {
           </aside>
         )}
 
+        {/* Today at a glance: greeting, progress ring, next dose & appointment */}
+        <TodayProgress
+          elderName={user.elderName}
+          viewerName={user.name}
+          viewerRole={user.role}
+          doses={doses}
+          appointments={appointments}
+          elderMode={elderMode}
+          highContrast={highContrast}
+        />
+
         {/* Text-to-Speech Player for Elder Mode */}
         <ElderSpeechPlayer
           elderName={user.elderName}
@@ -313,8 +325,38 @@ export default function DashboardPage() {
               </div>
 
               {doses.length === 0 ? (
-                <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 font-medium">
-                  No medications scheduled for today.
+                <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-300">
+                  <Pill className="w-10 h-10 mx-auto text-sky-500" aria-hidden="true" />
+                  <p className="mt-3 text-lg font-black text-slate-900">No medicines scheduled for today</p>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {user.role === "elder"
+                      ? "Your care team can add medicines, or scan a prescription for you."
+                      : "Add a medicine manually or let Gemini read a prescription photo for you."}
+                  </p>
+                  {user.role !== "elder" && (
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMedToEdit(null);
+                          setIsMedModalOpen(true);
+                        }}
+                        className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-bold inline-flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
+                      >
+                        <Plus className="w-4 h-4" aria-hidden="true" /> Add medicine
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setElderMode(false);
+                          setActiveTab("scan");
+                        }}
+                        className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-sm font-bold inline-flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
+                      >
+                        <Sparkles className="w-4 h-4 text-violet-600" aria-hidden="true" /> Scan a prescription
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4">
@@ -585,6 +627,13 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      <footer className="border-t border-slate-200 mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-semibold text-slate-600">
+          <p>CareCircle · keeping elders at the centre of their own care</p>
+          <p>Powered by Google Gemini 2.5 Flash · Google Cloud Firestore · Gmail reminders</p>
+        </div>
+      </footer>
 
       {/* Medication Modal */}
       <MedicationModal

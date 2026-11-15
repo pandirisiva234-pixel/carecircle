@@ -83,7 +83,14 @@ function initFirestore(): admin.firestore.Firestore | null {
         }),
       });
     }
-    firestoreDb = admin.firestore();
+    const db = admin.firestore();
+    try {
+      // Optional fields (e.g. takenAt when a dose is un-marked) must not crash writes
+      db.settings({ ignoreUndefinedProperties: true });
+    } catch {
+      // settings() can only be called once per instance (e.g. during hot reload) — safe to ignore
+    }
+    firestoreDb = db;
     useFirebase = true;
     console.log(`[CareCircle DB] Connected to Google Cloud Firestore (Project: ${projectId})`);
     return firestoreDb;

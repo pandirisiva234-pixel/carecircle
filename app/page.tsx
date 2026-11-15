@@ -222,7 +222,7 @@ export default function LandingPage() {
           <div className="space-y-4">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
               <Shield className="w-3.5 h-3.5" />
-              <span>WCAG Accessible • Vercel Ready • Firestore • Gemini 2.5 Flash</span>
+              <span>WCAG Accessible • Google Cloud Firestore • Gemini 2.5 Flash AI</span>
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
               Elder-centered care, <span className="text-sky-600">coordinated as a family.</span>
