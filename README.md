@@ -1,6 +1,8 @@
 # CareCircle — Elderly Care & Medication Management Platform
 
-> **An elder-centered healthcare coordination platform built with Next.js 15, Tailwind CSS, Google Cloud Firestore, Gemini 2.5 Flash AI, and Google Cloud Scheduler.**
+> **An elder-centered healthcare coordination platform built with Next.js 15, Tailwind CSS, Google Cloud Firestore, Gemini 2.5 Flash AI, and automated 15-minute GitHub Actions reminders.**
+
+Deployable out-of-the-box to **Vercel** with a zero-crash in-memory fallback for judges, plus a production-ready **Dockerfile** for containerized environments.
 
 ---
 
@@ -20,14 +22,14 @@
 
 1. **Elder at the Centre**: The elder interacts with a high-contrast, large-button interface, receives audible voice announcements via the **Web Speech API**, and is immediately notified whenever anyone updates their schedule.
 2. **Gemini 2.5 Flash Prescription Scanner**: Upload a picture of a paper prescription or medicine box. Multimodal AI extracts medication names, dosages, and daily timings into structured JSON, which users review and confirm before saving.
-3. **Dual-Phase Escalation Engine**: An automated 15-minute cron job powered by **Google Cloud Scheduler** sends gentle alerts to the elder first. If a critical dose remains unconfirmed after 30 minutes, it automatically escalates urgent notifications to caretakers and family members.
+3. **Dual-Phase Escalation Engine**: An automated 15-minute cron job powered by **GitHub Actions** (`.github/workflows/reminders.yml`) sends gentle alerts to the elder first. If a critical dose remains unconfirmed after 30 minutes, it automatically escalates urgent notifications to caretakers and family members.
 4. **Adherence Dashboard**: Real-time compliance tracking, 7-day visual adherence charts, and appointment management with 24-hour email reminders.
 
 ---
 
 ## 🚀 Live Demo Credentials for Judges
 
-Judges can explore CareCircle instantly without any manual configuration:
+Judges can explore CareCircle instantly without any manual configuration or credentials:
 
 - **Demo Circle ID**: `CC-DEMO`
 - **👵 Elder Account**: Margaret Jenkins (Age 78) — Passcode: `1234`
@@ -64,14 +66,15 @@ Judges can explore CareCircle instantly without any manual configuration:
 - Track provider visits with specialty, clinic location, and preparation notes.
 - Automated **24-hour advance email reminders** sent to all circle members.
 
-### 5. Automated Reminders & Cloud Scheduler Cron
-- Protected endpoint: `POST /api/cron/reminders` (authenticated via `CRON_SECRET` header).
-- Designed for **Google Cloud Scheduler** to trigger every 15 minutes.
+### 5. Automated Reminders & 15-Minute Escalation Cron
+- Protected endpoint: `POST /api/cron/reminders` (authenticated via `x-cron-secret` header).
+- Scheduled via **GitHub Actions** (`.github/workflows/reminders.yml`) running every 15 minutes.
 - **Three-Tier Notification Logic**:
-  1. Upcoming dose reminders (sent to elder ~15-30 min before schedule).
-  2. Missed dose gentle alert (sent directly to elder within 0-29 min overdue).
-  3. Escalated alert (sent to family and caretakers if overdue by $\ge 30$ minutes).
-  4. 24-hour appointment reminders.
+  1. **Upcoming Doses**: Gentle reminder to elder ~15-30 min before schedule.
+  2. **Missed Doses (Elder First)**: Gentle overdue alert sent directly to elder within 0-29 min overdue.
+  3. **Family Escalation**: If still missed after $\ge 30$ minutes, urgent escalation emails dispatched to family and caretakers.
+  4. **Appointments**: 24-hour advance appointment reminders.
+- **In-App Simulator**: Test the cron live directly from the dashboard!
 
 ### 6. Gemini 2.5 Flash Prescription Scanner
 - Multimodal OCR via `@google/genai` utilizing the `gemini-2.5-flash` model.
@@ -88,7 +91,7 @@ Judges can explore CareCircle instantly without any manual configuration:
 
 ---
 
-## 🏗 Architecture & Google Cloud Services
+## 🏗 Architecture & Cloud Services
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -97,18 +100,18 @@ Judges can explore CareCircle instantly without any manual configuration:
 └──────────────────────────────┬───────────────────────────────┘
                                │ HTTP / JSON
 ┌──────────────────────────────▼───────────────────────────────┐
-│              Google Cloud Run (Next.js Standalone)            │
-│  - App Router API Routes                                     │
+│              Vercel Serverless / Docker Standalone            │
+│  - Next.js 15 App Router API Routes                          │
 │  - Signed Session Cookies & Sliding-Window Rate Limiting     │
 │  - Security Headers (HSTS, CSP, X-Frame-Options, Sniffing)   │
 └──────┬───────────────────────┬───────────────────────┬───────┘
        │                       │                       │
 ┌──────▼─────────────┐ ┌───────▼───────────────┐ ┌─────▼────────────────┐
-│ Google Cloud       │ │ Google Gemini API     │ │ Google Cloud         │
-│ Firestore          │ │ Model:                │ │ Scheduler            │
-│ (firebase-admin)   │ │ gemini-2.5-flash      │ │ (15-min recurring    │
-│ Dual-mode local    │ │ Prescription Vision   │ │ HTTP cron trigger)   │
-│ fallback store     │ │ JSON Extraction       │ │                      │
+│ Google Cloud       │ │ Google Gemini API     │ │ GitHub Actions       │
+│ Firestore          │ │ Model:                │ │ (.github/workflows/  │
+│ (firebase-admin)   │ │ gemini-2.5-flash      │ │  reminders.yml)      │
+│ In-memory zero-    │ │ Prescription Vision   │ │ Every 15 minutes     │
+│ crash fallback     │ │ JSON Extraction       │ │                      │
 └────────────────────┘ └───────────────────────┘ └─────┬────────────────┘
                                                        │
                                                ┌───────▼────────────────┐
@@ -124,9 +127,10 @@ Judges can explore CareCircle instantly without any manual configuration:
 
 - **Framework**: Next.js 15 (App Router, TypeScript, React 19)
 - **Styling**: Tailwind CSS with custom elder accessibility tokens
-- **Database**: Google Cloud Firestore (`firebase-admin`) with automatic local fallback
+- **Database**: Google Cloud Firestore (`firebase-admin`) with zero-crash in-memory fallback
 - **Artificial Intelligence**: Google Gemini API (`@google/genai`, model `gemini-2.5-flash`)
 - **Email Engine**: Nodemailer with Gmail SMTP
+- **Scheduled Automation**: GitHub Actions workflow cron (`reminders.yml`)
 - **Security**: Bcrypt password hashing, HMAC-SHA256 signed cookies, rate limiting
 - **Validation**: Zod
 - **Icons**: Lucide React
@@ -134,48 +138,77 @@ Judges can explore CareCircle instantly without any manual configuration:
 
 ---
 
-## ⚙️ Setup & Local Development
+## ⚡ Deployment to Vercel (Recommended)
 
-### 1. Prerequisites
-- Node.js 20+ or 24+
-- npm 10+
+CareCircle works on **Vercel** completely out-of-the-box!
 
-### 2. Clone Repository
+### Step 1: Deploy with Vercel Git Integration
+1. Push your repository to GitHub.
+2. In the [Vercel Dashboard](https://vercel.com/new), import your `carecircle` repository.
+3. Framework Preset: **Next.js** (automatically detected).
+4. Root Directory: `./`
+
+### Step 2: Configure Environment Variables in Vercel
+In **Vercel Project Settings → Environment Variables**, add:
+
+| Variable | Description | Example / Note |
+| :--- | :--- | :--- |
+| `SESSION_SECRET` | 32+ char secret for signed session cookies | `carecircle-secure-secret-key-32-chars` |
+| `CRON_SECRET` | Secret token protecting the reminders endpoint | `my-secure-cron-secret-12345` |
+| `APP_URL` | Your public Vercel domain URL | `https://your-carecircle.vercel.app` |
+| `GEMINI_API_KEY` | Google Gemini API Key | From [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `FIREBASE_PROJECT_ID` | Google Cloud / Firebase Project ID | `your-firebase-project-id` |
+| `FIREBASE_CLIENT_EMAIL` | Service Account client email | `firebase-adminsdk@your-project.iam.gserviceaccount.com` |
+| `FIREBASE_PRIVATE_KEY` | Service Account private key | `-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n` |
+| `GMAIL_USER` | Gmail address for clinical alerts | `your.email@gmail.com` |
+| `GMAIL_APP_PASSWORD` | 16-character Gmail App Password | From Google Account Security |
+
+> **Zero-Crash Demo Guarantee for Judges**: If `FIREBASE_*` variables are not yet configured, CareCircle seamlessly falls back to an in-memory store pre-seeded with the demo circle (`CC-DEMO`). The app will **never crash** on Vercel even without external GCP credentials!
+
+### Step 3: Configure GitHub Actions 15-Minute Cron
+CareCircle includes [.github/workflows/reminders.yml](file:///.github/workflows/reminders.yml) which triggers every 15 minutes:
+
+1. In your GitHub repository, navigate to **Settings → Secrets and variables → Actions**.
+2. Click **New repository secret** and add:
+   - `APP_URL`: Your live Vercel app URL (e.g. `https://your-carecircle.vercel.app`).
+   - `CRON_SECRET`: Same token set in your Vercel `CRON_SECRET`.
+3. The workflow will automatically run every 15 minutes and can also be triggered manually under the **Actions** tab with the **"Run workflow"** button.
+
+---
+
+## 🐳 Optional: Docker & Cloud Run Deployment
+
+CareCircle also includes a production multi-stage `Dockerfile` with `output: "standalone"`:
+
 ```bash
-git clone https://github.com/your-username/carecircle.git
-cd carecircle
+# Build Docker image
+docker build -t carecircle .
+
+# Run container locally on port 8080
+docker run -p 8080:8080 --env-file .env.local carecircle
 ```
 
-### 3. Install Dependencies
+Or deploy to Google Cloud Run:
+```bash
+gcloud builds submit --tag gcr.io/<PROJECT_ID>/carecircle
+gcloud run deploy carecircle --image gcr.io/<PROJECT_ID>/carecircle --platform managed --region us-central1 --allow-unauthenticated
+```
+
+---
+
+## 💻 Local Development
+
+### 1. Install Dependencies
 ```bash
 npm install
 ```
 
-### 4. Configure Environment Variables
-Copy `.env.example` to `.env.local`:
+### 2. Configure Local Environment
 ```bash
 cp .env.example .env.local
 ```
 
-Configure your credentials in `.env.local`:
-```env
-SESSION_SECRET="carecircle-secure-random-32-byte-secret-key-change-me"
-CRON_SECRET="carecircle-cron-secret-change-me"
-
-# Google Gemini API
-GEMINI_API_KEY="your-google-gemini-api-key"
-
-# Google Cloud Firestore (Option A: ADC on Cloud Run; Option B: Service Account)
-FIREBASE_PROJECT_ID="your-gcp-project-id"
-
-# Gmail SMTP for Alerts
-GMAIL_USER="carecircle.alerts@gmail.com"
-GMAIL_APP_PASSWORD="your-16-char-gmail-app-password"
-```
-
-*(Note: If Firestore or Gemini API keys are omitted in development or test environments, CareCircle gracefully uses the pre-seeded local JSON store and smart parser so judges can run the entire platform out of the box with zero external configuration!)*
-
-### 5. Run Development Server
+### 3. Run Development Server
 ```bash
 npm run dev
 ```
@@ -196,37 +229,6 @@ Expected output:
  ✓ tests/adherence.test.ts (9 tests)
  Test Files  1 passed (1)
       Tests  9 passed (9)
-```
-
----
-
-## ☁️ Google Cloud Run Deployment
-
-CareCircle includes a production-ready multi-stage `Dockerfile` with `output: "standalone"` enabled.
-
-### 1. Build and Submit Container Image
-```bash
-gcloud builds submit --tag gcr.io/<PROJECT_ID>/carecircle
-```
-
-### 2. Deploy to Cloud Run
-```bash
-gcloud run deploy carecircle \
-  --image gcr.io/<PROJECT_ID>/carecircle \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars FIREBASE_PROJECT_ID="<PROJECT_ID>",CRON_SECRET="<SECRET>",GEMINI_API_KEY="<KEY>"
-```
-
-### 3. Configure Google Cloud Scheduler (15-min Cron)
-```bash
-gcloud scheduler jobs create http carecircle-15min-reminders \
-  --schedule="*/15 * * * *" \
-  --uri="https://<YOUR-CLOUD-RUN-URL>/api/cron/reminders" \
-  --http-method=POST \
-  --headers="x-cron-secret=<CRON_SECRET>" \
-  --time-zone="America/New_York"
 ```
 
 ---

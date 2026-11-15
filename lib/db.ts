@@ -13,7 +13,7 @@ import {
 } from "./types";
 
 // ==========================================
-// 1. Firebase Admin Initialization (GCP Firestore)
+// 1. Firebase Admin Initialization (Firestore)
 // ==========================================
 let firestoreDb: admin.firestore.Firestore | null = null;
 let useFirebase = false;
@@ -23,48 +23,53 @@ function initFirestore(): admin.firestore.Firestore | null {
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (!projectId) {
+  // Handle escaped \n in the private key as required
+  const privateKey = rawPrivateKey?.replace(/\\n/g, "\n");
+
+  // If any required Firestore credential is missing, gracefully fall back to in-memory store
+  if (!projectId || !clientEmail || !privateKey) {
+    // Only log once
+    if (!(globalThis as any).__carecircle_db_logged) {
+      console.log(
+        "[CareCircle DB] Firebase credentials missing or partial (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY). Using in-memory store with seeded demo data (Vercel & Judge ready)."
+      );
+      (globalThis as any).__carecircle_db_logged = true;
+    }
     return null;
   }
 
   try {
     if (admin.apps.length === 0) {
-      if (clientEmail && privateKey) {
-        admin.initializeApp({
-          credential: admin.credential.cert({
-            projectId,
-            clientEmail,
-            privateKey,
-          }),
-        });
-      } else {
-        // Application Default Credentials (e.g. on Google Cloud Run)
-        admin.initializeApp({
+      admin.initializeApp({
+        credential: admin.credential.cert({
           projectId,
-        });
-      }
+          clientEmail,
+          privateKey,
+        }),
+      });
     }
     firestoreDb = admin.firestore();
     useFirebase = true;
     console.log(`[CareCircle DB] Connected to Google Cloud Firestore (Project: ${projectId})`);
     return firestoreDb;
   } catch (err) {
-    console.warn("[CareCircle DB] Firebase init skipped or failed, falling back to local persistent store:", err);
+    console.warn(
+      "[CareCircle DB] Firebase initialization failed, falling back to in-memory store with demo data:",
+      err
+    );
     return null;
   }
 }
 
-// Try initializing Firestore once at startup
+// Attempt initialization once at module load
 initFirestore();
 
 // ==========================================
-// 2. Local Fallback & Seed Data Store
+// 2. In-Memory Store with Demo Data (Zero-Crash Fallback)
 // ==========================================
-const DATA_FILE = path.join(process.cwd(), ".carecircle-local-db.json");
-
-interface LocalStoreSchema {
+interface StoreSchema {
   circles: Record<string, Circle>;
   members: Record<string, Member>;
   medications: Record<string, Medication>;
@@ -73,7 +78,7 @@ interface LocalStoreSchema {
   activityLogs: Record<string, ActivityLog>;
 }
 
-function getInitialDemoData(): LocalStoreSchema {
+function getInitialDemoData(): StoreSchema {
   const salt = bcrypt.genSaltSync(10);
   const now = new Date().toISOString();
   const today = new Date().toISOString().split("T")[0];
@@ -183,7 +188,6 @@ function getInitialDemoData(): LocalStoreSchema {
     },
   };
 
-  // Generate today's sample dose events
   const doseEvents: Record<string, DoseEvent> = {
     "dose-1": {
       id: "dose-1",
@@ -258,7 +262,6 @@ function getInitialDemoData(): LocalStoreSchema {
     },
   };
 
-  // Sample Appointments
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowDateStr = tomorrow.toISOString().split("T")[0];
@@ -349,67 +352,66 @@ function getInitialDemoData(): LocalStoreSchema {
   };
 }
 
-let localStore: LocalStoreSchema | null = null;
-
-function loadLocalStore(): LocalStoreSchema {
-  if (localStore) return localStore;
-
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, "utf-8");
-      localStore = JSON.parse(raw);
-      return localStore!;
-    }
-  } catch (err) {
-    console.error("[CareCircle DB] Failed reading local store file, reinitializing demo data:", err);
-  }
-
-  localStore = getInitialDemoData();
-  saveLocalStore(localStore);
-  return localStore;
+// In-memory store cached on globalThis across serverless function invocations
+declare global {
+  // eslint-disable-next-line no-var
+  var __carecircle_in_memory_store: StoreSchema | undefined;
 }
 
-function saveLocalStore(store: LocalStoreSchema): void {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2), "utf-8");
-  } catch (err) {
-    console.error("[CareCircle DB] Error saving local store file:", err);
+function getStore(): StoreSchema {
+  if (!globalThis.__carecircle_in_memory_store) {
+    globalThis.__carecircle_in_memory_store = getInitialDemoData();
   }
+  return globalThis.__carecircle_in_memory_store;
 }
 
 // ==========================================
-// 3. Unified Data Access Operations
+// 3. Unified Safe Data Access Operations
 // ==========================================
 
 // --- Circles ---
 export async function getCircle(circleId: string): Promise<Circle | null> {
   const db = initFirestore();
   if (db) {
-    const doc = await db.collection("circles").doc(circleId).get();
-    return doc.exists ? (doc.data() as Circle) : null;
+    try {
+      const doc = await db.collection("circles").doc(circleId).get();
+      if (doc.exists) return doc.data() as Circle;
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getCircle failed, falling back to in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
+  const store = getStore();
   return store.circles[circleId] || null;
 }
 
 export async function saveCircle(circle: Circle): Promise<void> {
+  const store = getStore();
+  store.circles[circle.id] = circle;
+
   const db = initFirestore();
   if (db) {
-    await db.collection("circles").doc(circle.id).set(circle);
+    try {
+      await db.collection("circles").doc(circle.id).set(circle);
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore saveCircle failed, saved in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  store.circles[circle.id] = circle;
-  saveLocalStore(store);
 }
 
 // --- Members ---
 export async function getMembersByCircle(circleId: string): Promise<Member[]> {
   const db = initFirestore();
   if (db) {
-    const snap = await db.collection("members").where("circleId", "==", circleId).get();
-    return snap.docs.map((d) => d.data() as Member);
+    try {
+      const snap = await db.collection("members").where("circleId", "==", circleId).get();
+      if (!snap.empty) {
+        return snap.docs.map((d) => d.data() as Member);
+      }
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getMembersByCircle failed, falling back to in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
+  const store = getStore();
   return Object.values(store.members).filter((m) => m.circleId === circleId);
 }
 
@@ -419,68 +421,96 @@ export async function getMemberByCircleAndRole(circleId: string, role: Role): Pr
 }
 
 export async function saveMember(member: Member): Promise<void> {
+  const store = getStore();
+  store.members[member.id] = member;
+
   const db = initFirestore();
   if (db) {
-    await db.collection("members").doc(member.id).set(member);
+    try {
+      await db.collection("members").doc(member.id).set(member);
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore saveMember failed, saved in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  store.members[member.id] = member;
-  saveLocalStore(store);
 }
 
 // --- Medications ---
 export async function getMedications(circleId: string): Promise<Medication[]> {
   const db = initFirestore();
   if (db) {
-    const snap = await db.collection("medications").where("circleId", "==", circleId).get();
-    return snap.docs.map((d) => d.data() as Medication);
+    try {
+      const snap = await db.collection("medications").where("circleId", "==", circleId).get();
+      if (!snap.empty) {
+        return snap.docs.map((d) => d.data() as Medication);
+      }
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getMedications failed, falling back to in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
+  const store = getStore();
   return Object.values(store.medications).filter((m) => m.circleId === circleId);
 }
 
 export async function getMedicationById(id: string): Promise<Medication | null> {
   const db = initFirestore();
   if (db) {
-    const doc = await db.collection("medications").doc(id).get();
-    return doc.exists ? (doc.data() as Medication) : null;
+    try {
+      const doc = await db.collection("medications").doc(id).get();
+      if (doc.exists) return doc.data() as Medication;
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getMedicationById failed, falling back to in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
+  const store = getStore();
   return store.medications[id] || null;
 }
 
 export async function saveMedication(med: Medication): Promise<void> {
+  const store = getStore();
+  store.medications[med.id] = med;
+
   const db = initFirestore();
   if (db) {
-    await db.collection("medications").doc(med.id).set(med);
+    try {
+      await db.collection("medications").doc(med.id).set(med);
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore saveMedication failed, saved in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  store.medications[med.id] = med;
-  saveLocalStore(store);
 }
 
 export async function deleteMedication(id: string): Promise<void> {
+  const store = getStore();
+  delete store.medications[id];
+
   const db = initFirestore();
   if (db) {
-    await db.collection("medications").doc(id).delete();
+    try {
+      await db.collection("medications").doc(id).delete();
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore deleteMedication failed, deleted in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  delete store.medications[id];
-  saveLocalStore(store);
 }
 
 // --- Dose Events ---
 export async function getDoseEvents(circleId: string, dateStr?: string): Promise<DoseEvent[]> {
   const db = initFirestore();
   if (db) {
-    let q = db.collection("dose_events").where("circleId", "==", circleId);
-    if (dateStr) {
-      q = q.where("scheduledDate", "==", dateStr);
+    try {
+      let q = db.collection("dose_events").where("circleId", "==", circleId);
+      if (dateStr) {
+        q = q.where("scheduledDate", "==", dateStr);
+      }
+      const snap = await q.get();
+      if (!snap.empty) {
+        return snap.docs.map((d) => d.data() as DoseEvent);
+      }
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getDoseEvents failed, falling back to in-memory:", err);
     }
-    const snap = await q.get();
-    return snap.docs.map((d) => d.data() as DoseEvent);
   }
-  const store = loadLocalStore();
+  const store = getStore();
   return Object.values(store.doseEvents).filter(
     (e) => e.circleId === circleId && (!dateStr || e.scheduledDate === dateStr)
   );
@@ -489,71 +519,101 @@ export async function getDoseEvents(circleId: string, dateStr?: string): Promise
 export async function getAllDoseEvents(circleId: string): Promise<DoseEvent[]> {
   const db = initFirestore();
   if (db) {
-    const snap = await db.collection("dose_events").where("circleId", "==", circleId).get();
-    return snap.docs.map((d) => d.data() as DoseEvent);
+    try {
+      const snap = await db.collection("dose_events").where("circleId", "==", circleId).get();
+      if (!snap.empty) {
+        return snap.docs.map((d) => d.data() as DoseEvent);
+      }
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getAllDoseEvents failed, falling back to in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
+  const store = getStore();
   return Object.values(store.doseEvents).filter((e) => e.circleId === circleId);
 }
 
 export async function saveDoseEvent(event: DoseEvent): Promise<void> {
+  const store = getStore();
+  store.doseEvents[event.id] = event;
+
   const db = initFirestore();
   if (db) {
-    await db.collection("dose_events").doc(event.id).set(event);
+    try {
+      await db.collection("dose_events").doc(event.id).set(event);
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore saveDoseEvent failed, saved in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  store.doseEvents[event.id] = event;
-  saveLocalStore(store);
 }
 
 export async function updateDoseEvent(id: string, updates: Partial<DoseEvent>): Promise<DoseEvent | null> {
+  const store = getStore();
+  if (store.doseEvents[id]) {
+    store.doseEvents[id] = {
+      ...store.doseEvents[id],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   const db = initFirestore();
   if (db) {
-    const ref = db.collection("dose_events").doc(id);
-    await ref.update({ ...updates, updatedAt: new Date().toISOString() });
-    const updated = await ref.get();
-    return updated.data() as DoseEvent;
+    try {
+      const ref = db.collection("dose_events").doc(id);
+      await ref.update({ ...updates, updatedAt: new Date().toISOString() });
+      const updated = await ref.get();
+      if (updated.exists) return updated.data() as DoseEvent;
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore updateDoseEvent failed, updated in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  if (!store.doseEvents[id]) return null;
-  store.doseEvents[id] = {
-    ...store.doseEvents[id],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-  saveLocalStore(store);
-  return store.doseEvents[id];
+
+  return store.doseEvents[id] || null;
 }
 
 // --- Appointments ---
 export async function getAppointments(circleId: string): Promise<Appointment[]> {
   const db = initFirestore();
   if (db) {
-    const snap = await db.collection("appointments").where("circleId", "==", circleId).get();
-    return snap.docs.map((d) => d.data() as Appointment);
+    try {
+      const snap = await db.collection("appointments").where("circleId", "==", circleId).get();
+      if (!snap.empty) {
+        return snap.docs.map((d) => d.data() as Appointment);
+      }
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getAppointments failed, falling back to in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
+  const store = getStore();
   return Object.values(store.appointments).filter((a) => a.circleId === circleId);
 }
 
 export async function saveAppointment(apt: Appointment): Promise<void> {
+  const store = getStore();
+  store.appointments[apt.id] = apt;
+
   const db = initFirestore();
   if (db) {
-    await db.collection("appointments").doc(apt.id).set(apt);
+    try {
+      await db.collection("appointments").doc(apt.id).set(apt);
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore saveAppointment failed, saved in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  store.appointments[apt.id] = apt;
-  saveLocalStore(store);
 }
 
 export async function deleteAppointment(id: string): Promise<void> {
+  const store = getStore();
+  delete store.appointments[id];
+
   const db = initFirestore();
   if (db) {
-    await db.collection("appointments").doc(id).delete();
+    try {
+      await db.collection("appointments").doc(id).delete();
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore deleteAppointment failed, deleted in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  delete store.appointments[id];
-  saveLocalStore(store);
 }
 
 // --- Activity Logs ---
@@ -564,38 +624,49 @@ export async function logActivity(log: Omit<ActivityLog, "id" | "timestamp">): P
     timestamp: new Date().toISOString(),
   };
 
+  const store = getStore();
+  store.activityLogs[fullLog.id] = fullLog;
+
   const db = initFirestore();
   if (db) {
-    await db.collection("activity_logs").doc(fullLog.id).set(fullLog);
+    try {
+      await db.collection("activity_logs").doc(fullLog.id).set(fullLog);
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore logActivity failed, logged in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
-  store.activityLogs[fullLog.id] = fullLog;
-  saveLocalStore(store);
+
   return fullLog;
 }
 
 export async function getActivityLogs(circleId: string, limitCount = 50): Promise<ActivityLog[]> {
   const db = initFirestore();
   if (db) {
-    const snap = await db
-      .collection("activity_logs")
-      .where("circleId", "==", circleId)
-      .orderBy("timestamp", "desc")
-      .limit(limitCount)
-      .get();
-    return snap.docs.map((d) => d.data() as ActivityLog);
+    try {
+      const snap = await db
+        .collection("activity_logs")
+        .where("circleId", "==", circleId)
+        .orderBy("timestamp", "desc")
+        .limit(limitCount)
+        .get();
+      if (!snap.empty) {
+        return snap.docs.map((d) => d.data() as ActivityLog);
+      }
+    } catch (err) {
+      console.warn("[CareCircle DB] Firestore getActivityLogs failed, falling back to in-memory:", err);
+    }
   }
-  const store = loadLocalStore();
+  const store = getStore();
   return Object.values(store.activityLogs)
     .filter((a) => a.circleId === circleId)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, limitCount);
 }
 
-// Helper to check if Firebase is live or local fallback active
-export function getDbStatus(): { mode: "firestore" | "local_store"; projectId?: string } {
+// Helper to check DB status
+export function getDbStatus(): { mode: "firestore" | "in_memory"; projectId?: string } {
   return {
-    mode: useFirebase ? "firestore" : "local_store",
+    mode: useFirebase ? "firestore" : "in_memory",
     projectId: process.env.FIREBASE_PROJECT_ID,
   };
 }

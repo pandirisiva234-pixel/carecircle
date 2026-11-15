@@ -53,10 +53,10 @@ export function CronTesterModal({ onTriggered, highContrast }: CronTesterModalPr
         <div>
           <div className="flex items-center space-x-2 text-emerald-600 font-bold text-xs uppercase tracking-wider">
             <Clock className="w-4 h-4" />
-            <span>Google Cloud Scheduler 15-Min Engine</span>
+            <span>Automated 15-Min Reminders Engine (GitHub Actions & Cron)</span>
           </div>
           <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-            Automated Reminder & Escalation Cron
+            Automated Reminder & Escalation Engine
           </h3>
           <p className="text-sm text-slate-600 mt-0.5">
             Endpoint <code className="bg-slate-100 text-xs px-1.5 py-0.5 rounded font-mono">POST /api/cron/reminders</code> protected by CRON_SECRET header
